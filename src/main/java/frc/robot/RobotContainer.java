@@ -23,6 +23,7 @@ import frc.robot.config.VisionSetup;
 import frc.robot.constants.DriveConstants;
 import frc.robot.constants.HardwareConstants;
 import frc.robot.subsystems.DriveSubsystem;
+import frc.robot.subsystems.MatchStateTracker;
 import frc.robot.subsystems.VisionProvider;
 
 /**
@@ -60,6 +61,9 @@ public class RobotContainer {
 
   /** Drive subsystem - Created by SubsystemSetup */
   private final DriveSubsystem drive = SubsystemSetup.createDriveSubsystem(vision);
+
+  /** Match state tracker - Tracks hub status and shift timing for 2026 REBUILT */
+  private final MatchStateTracker matchState = new MatchStateTracker();
 
   // =========================================================================
   // CONTROLLERS
@@ -141,7 +145,7 @@ public class RobotContainer {
     // ═════════════════════════════════════════════════════════════════════
     // STEP 5: Configure dashboard (see config/DashboardSetup.java)
     // ═════════════════════════════════════════════════════════════════════
-    dashboardSetup = new DashboardSetup(drive, autoSelector.getChooser());
+    dashboardSetup = new DashboardSetup(drive, matchState, autoSelector.getChooser());
     dashboardSetup.configureAll();
 
     // ═════════════════════════════════════════════════════════════════════
@@ -178,6 +182,15 @@ public class RobotContainer {
    */
   public DriveSubsystem getDriveSubsystem() {
     return drive;
+  }
+
+  /**
+   * Gets match state tracker instance.
+   *
+   * @return Match state tracker
+   */
+  public MatchStateTracker getMatchStateTracker() {
+    return matchState;
   }
 
   /**

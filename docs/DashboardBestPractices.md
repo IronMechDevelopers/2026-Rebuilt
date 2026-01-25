@@ -1,29 +1,28 @@
 # Dashboard Best Practices
 
-A guide to organizing and using Shuffleboard and AdvantageScope effectively.
+A guide to organizing dashboards using Elastic and AdvantageScope.
 
 ---
 
 ## Table of Contents
 
 1. [Dashboard Philosophy](#dashboard-philosophy)
-2. [Tab Organization by Audience](#tab-organization-by-audience)
-3. [When to Use Each Tool](#when-to-use-each-tool)
-4. [Design Principles](#design-principles)
-5. [Data Flow Architecture](#data-flow-architecture)
-6. [Tab Reference](#tab-reference)
+2. [NetworkTables Key Reference](#networktables-key-reference)
+3. [Elastic Setup Guide](#elastic-setup-guide)
+4. [AdvantageScope Usage](#advantagescope-usage)
+5. [2026 REBUILT Match Dashboard](#2026-rebuilt-match-dashboard)
 
 ---
 
 ## Dashboard Philosophy
 
 ```
-THE THREE TOOLS - EACH HAS A PURPOSE
+THE TWO TOOLS - EACH HAS A PURPOSE
 ═══════════════════════════════════════════════════════════════════════════════
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           SHUFFLEBOARD                                      │
-│                      (Live Match Display)                                   │
+│                              ELASTIC                                         │
+│                        (Live Match Display)                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  PURPOSE:  Show critical info DURING matches                                │
@@ -32,15 +31,15 @@ THE THREE TOOLS - EACH HAS A PURPOSE
 │                                                                             │
 │  GOOD FOR:                                                                  │
 │  ├── Auto selector                                                          │
+│  ├── Hub status (ACTIVE/INACTIVE) for 2026 REBUILT                         │
+│  ├── Warning banners (CLEAR ZONE, GET READY, CLIMB NOW)                    │
 │  ├── Battery voltage                                                        │
 │  ├── Vision status (working/broken)                                         │
-│  ├── System health checks                                                   │
-│  └── Quick toggle switches                                                  │
+│  └── Field visualization                                                    │
 │                                                                             │
 │  BAD FOR:                                                                   │
-│  ├── Detailed graphs (too small to read)                                    │
-│  ├── Lots of numbers (overwhelming)                                         │
-│  └── Historical data (can't scroll back)                                    │
+│  ├── Historical data (can't scroll back)                                    │
+│  └── Detailed graphs (use AdvantageScope)                                   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 
@@ -57,235 +56,18 @@ THE THREE TOOLS - EACH HAS A PURPOSE
 │  ├── Comparing odometry vs vision poses                                     │
 │  ├── Finding when/why something failed                                      │
 │  ├── Tuning PID by looking at response curves                               │
-│  ├── 3D robot visualization                                                 │
-│  └── Sharing logs with mentors/other teams                                  │
+│  ├── 3D robot visualization with AprilTags                                  │
+│  ├── Sharing logs with mentors/other teams                                  │
+│  └── Replaying exact driver inputs                                          │
 │                                                                             │
 │  BAD FOR:                                                                   │
-│  ├── Real-time driver feedback (use Shuffleboard)                           │
+│  ├── Real-time driver feedback (use Elastic)                                │
 │  └── Quick pit checks (takes time to load)                                  │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          SMARTDASHBOARD                                     │
-│                        (Data Bus Only)                                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  PURPOSE:  Transfer data between subsystems and dashboard                   │
-│  WHEN:     Behind the scenes, not for direct viewing                        │
-│  STYLE:    SmartDashboard.putX() / SmartDashboard.getX()                   │
-│                                                                             │
-│  GOOD FOR:                                                                  │
-│  ├── Subsystems publishing data                                             │
-│  ├── Toggle switches reading user input                                     │
-│  └── Sharing data between disconnected components                           │
-│                                                                             │
-│  BAD FOR:                                                                   │
-│  ├── Direct viewing (use Shuffleboard tabs)                                 │
-│  └── Logging (use Logger.recordOutput)                                      │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## Tab Organization by Audience
-
-Different people need different information. Organize tabs by WHO will use them.
-
-### Match Tab (Drive Team)
-
-**Audience:** Drivers and coach during competition matches
-
-**Design Rules:**
-- Maximum 6 large widgets
-- Must be readable from 10 feet away
-- Green = good, Red = bad (no ambiguity)
-- Only show what MUST be known during a match
-
-**Widgets:**
-| Widget | Purpose |
-|--------|---------|
-| Auto Selector | Verify correct auto before match |
-| Battery | Know if power is getting low |
-| Vision Status | Know if auto-aim will work |
-| Speed Mode | Know current speed setting |
-| Field Relative | Know drive orientation mode |
-| Tag Count | Quick vision feedback |
-
-### Pit Tab (Pit Crew)
-
-**Audience:** Pit crew doing pre-match checks
-
-**Design Rules:**
-- All system health at a glance
-- Quick buttons for common operations
-- Status indicators for each major system
-
-**Widgets:**
-| Widget | Purpose |
-|--------|---------|
-| System Status List | All health checks in one place |
-| Camera Connection | Verify cameras working |
-| Battery Voltage | Check charge level |
-| Coast/Brake Buttons | Set mode for transport |
-| Position Display | Verify pose estimation |
-
-### Debug Tab (Software Team)
-
-**Audience:** Programmers during testing and development
-
-**Design Rules:**
-- All the detailed data
-- PID tuning widgets
-- Test commands
-- Not meant for competition
-
-**Widgets:**
-| Widget | Purpose |
-|--------|---------|
-| Full Pose Data | X, Y, heading, rates |
-| PID Values | Tune controllers |
-| Vision Details | Ambiguity, failures |
-| Test Commands | Trigger specific behaviors |
-| System Info | CPU temp, brownout |
-
-### Vision Cal Tab (Vision Team)
-
-**Audience:** Anyone calibrating or testing vision
-
-**Design Rules:**
-- Everything needed to verify vision works
-- **Field View to visualize where robot thinks it is**
-- **Sanity checks to catch bad camera transforms**
-- Toggle switches for modes
-- Per-camera detailed metrics
-
-**Widgets:**
-| Widget | Purpose |
-|--------|---------|
-| **Field View** | Shows robot position on field - THE key diagnostic tool |
-| **POSE SANE?** | Red if pose is outside field or spinning wildly |
-| **Fused Pose** | X, Y, Heading from vision+odometry fusion |
-| **Sanity Checks** | In-bounds and spin rate checks |
-| Vision Enable Toggle | Turn vision on/off |
-| Classroom Mode Toggle | Relaxed thresholds for testing |
-| Per-Camera Status | Connection, targets, latency, ambiguity |
-| Best Target Info | Which tag is most reliable |
-
----
-
-## When to Use Each Tool
-
-### Use Shuffleboard When...
-
-```
-✅ Showing status during a match
-✅ Driver needs to verify something before match
-✅ Pit crew doing quick health check
-✅ Testing with toggle switches or buttons
-✅ Information needs to be seen at a glance
-```
-
-### Use AdvantageScope When...
-
-```
-✅ Figuring out why autonomous failed
-✅ Comparing vision pose to odometry pose
-✅ Tuning PID by looking at step response
-✅ Sharing match logs with mentors
-✅ Doing detailed post-match analysis
-✅ Visualizing robot in 3D on field
-```
-
-### Use Logger.recordOutput() When...
-
-```
-✅ You want data in AdvantageScope
-✅ Logging poses (Pose2d, Pose3d)
-✅ Logging module states
-✅ Any detailed telemetry for later analysis
-✅ Data you don't need to see live but want to review
-```
-
-### Use SmartDashboard When...
-
-```
-✅ Subsystem needs to publish data for dashboard to read
-✅ Toggle switch on dashboard needs to control subsystem
-✅ Data needs to flow between disconnected components
-❌ NOT for direct viewing (use Shuffleboard)
-❌ NOT for logging (use Logger.recordOutput)
-```
-
----
-
-## Design Principles
-
-### 1. Less is More (Match Tab)
-
-```
-BAD:                                    GOOD:
-┌─────────────────────────────────┐    ┌─────────────────────────────────┐
-│ X: 2.34  Y: 5.67  H: 45.2°     │    │                                 │
-│ VX: 1.2  VY: 0.3  ω: 0.5      │    │   ┌───────────────────────┐     │
-│ FL: 2.1  FR: 2.0  RL: 2.1     │    │   │     AUTO MODE         │     │
-│ RR: 2.0  Gyro: 45.3  Rate: 0  │    │   │  [Score 3 Notes]      │     │
-│ Bat: 12.4  CPU: 45  Mem: 67%  │    │   └───────────────────────┘     │
-│ Tag1: 2.3m  Tag2: 4.1m  ...   │    │                                 │
-│ Amb: 0.03  Lat: 32ms  ...     │    │   BATTERY    VISION            │
-│ ...too much to read...         │    │   [12.4V]    [GREEN]           │
-└─────────────────────────────────┘    └─────────────────────────────────┘
-
-Driver can't find anything!            Driver sees what matters instantly!
-```
-
-### 2. Use Boolean Boxes for Status
-
-```
-HARD TO READ:                          EASY TO READ:
-
-  Vision Status: "HEALTHY"              Vision: [████████]  (GREEN)
-  Vision Status: "UNHEALTHY - 5 fail"   Vision: [████████]  (RED)
-
-Text requires reading and parsing.     Color is instant recognition.
-```
-
-### 3. Group Related Information
-
-```
-SCATTERED:                             GROUPED:
-
-  ┌──────┐ ┌──────┐ ┌──────┐         ┌─────────────────────────────┐
-  │ X    │ │ Bat  │ │ Y    │         │      POSITION               │
-  └──────┘ └──────┘ └──────┘         ├─────────────────────────────┤
-  ┌──────┐ ┌──────┐ ┌──────┐         │ X: 2.34  Y: 5.67  H: 45°   │
-  │ Gyro │ │ Head │ │ Vis  │         └─────────────────────────────┘
-  └──────┘ └──────┘ └──────┘
-
-  Eyes have to jump around.            Information is organized logically.
-```
-
-### 4. Log Everything, Display Selectively
-
-```
-LOGGING (Logger.recordOutput):          DISPLAY (Shuffleboard):
-├── Every module velocity               ├── Vision healthy? (yes/no)
-├── Every module angle                  ├── Battery voltage
-├── Gyro rate                          ├── Auto mode selected
-├── All vision detections              └── Speed multiplier
-├── All rejected measurements
-├── Command states
-├── PID errors
-└── Timestamps
-
-Everything goes to log for             Only critical info on dashboard
-later analysis in AdvantageScope       for real-time viewing
-```
-
----
-
-## Data Flow Architecture
+### Data Flow Architecture
 
 ```
 DATA FLOW IN YOUR ROBOT CODE
@@ -294,214 +76,251 @@ DATA FLOW IN YOUR ROBOT CODE
                          ┌─────────────────┐
                          │   SUBSYSTEMS    │
                          │ (VisionSubsystem│
-                         │  DriveSubsystem)│
+                         │  DriveSubsystem │
+                         │MatchStateTracker│
                          └────────┬────────┘
                                   │
               ┌───────────────────┼───────────────────┐
               │                   │                   │
               ▼                   ▼                   ▼
     ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-    │ SmartDashboard  │ │ Logger.record   │ │ Direct to       │
-    │ .putX()         │ │ Output()        │ │ Shuffleboard    │
-    │                 │ │                 │ │ via lambda      │
-    │ Data Bus        │ │ AdvantageKit    │ │                 │
+    │ SmartDashboard  │ │ Logger.record   │ │ DashboardSetup  │
+    │ .putX()         │ │ Output()        │ │ .periodic()     │
+    │                 │ │                 │ │                 │
+    │ NetworkTables   │ │ AdvantageKit    │ │ Aggregates data │
     └────────┬────────┘ └────────┬────────┘ └────────┬────────┘
              │                   │                   │
-             ▼                   ▼                   │
-    ┌─────────────────┐ ┌─────────────────┐          │
-    │ DashboardSetup  │ │ Log File        │          │
-    │ reads via       │ │ (.wpilog)       │          │
-    │ SmartDashboard  │ │                 │          │
-    │ .getX()         │ │                 │          │
-    └────────┬────────┘ └────────┬────────┘          │
              │                   │                   │
              ▼                   ▼                   ▼
     ┌─────────────────────────────────────────────────────────┐
-    │                      SHUFFLEBOARD                        │
-    │  (Match, Pit, Debug, Vision Cal tabs)                   │
-    └─────────────────────────────────────────────────────────┘
-                                  │
-                                  │ (Log files loaded later)
-                                  ▼
-    ┌─────────────────────────────────────────────────────────┐
-    │                     ADVANTAGESCOPE                       │
-    │  (Post-match analysis, 3D visualization, graphs)        │
-    └─────────────────────────────────────────────────────────┘
-```
-
-### Recommended Pattern
-
-1. **Subsystems** publish to SmartDashboard for toggle switches and status
-2. **Subsystems** use Logger.recordOutput for detailed telemetry
-3. **DashboardSetup** reads SmartDashboard OR uses direct lambdas to subsystems
-4. **AdvantageScope** replays log files for analysis
-
----
-
-## Tab Reference
-
-### Match Tab Layout
-
-```
-┌───────────────────────────────────────────────────────────────────────────┐
-│  MATCH TAB                                                    Team XXXX  │
-├───────────────────────────────────────────────────────────────────────────┤
-│                                                                           │
-│  ┌─────────────────────────┐  ┌───────────┐  ┌───────────────────────┐  │
-│  │                         │  │           │  │                       │  │
-│  │      AUTO MODE          │  │  BATTERY  │  │       VISION          │  │
-│  │   [Score 3 Notes]       │  │   12.4V   │  │      [GREEN]          │  │
-│  │                         │  │    ⚡     │  │                       │  │
-│  └─────────────────────────┘  └───────────┘  └───────────────────────┘  │
-│                                                                           │
-│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────────────────┐  │
-│  │   SPEED   │  │ FIELD REL │  │   TAGS    │  │       HEADING         │  │
-│  │   FULL    │  │  [GREEN]  │  │  2 (MULTI)│  │         45°           │  │
-│  └───────────┘  └───────────┘  └───────────┘  └───────────────────────┘  │
-│                                                                           │
-└───────────────────────────────────────────────────────────────────────────┘
-```
-
-### Pit Tab Layout
-
-```
-┌───────────────────────────────────────────────────────────────────────────┐
-│  PIT TAB                                                      Team XXXX  │
-├───────────────────────────────────────────────────────────────────────────┤
-│                                                                           │
-│  ┌─────────────────────┐  ┌───────────────────┐  ┌─────────────────────┐ │
-│  │   SYSTEM STATUS     │  │   PIT COMMANDS    │  │     POSITION        │ │
-│  ├─────────────────────┤  ├───────────────────┤  ├─────────────────────┤ │
-│  │ Battery:     12.4V  │  │ [Coast Mode    ]  │  │ X:      2.34 m      │ │
-│  │ Vision:    [GREEN]  │  │ [Brake Mode    ]  │  │ Y:      5.67 m      │ │
-│  │ Front Cam: [GREEN]  │  │ [Zero Heading  ]  │  │ Heading: 45.0°      │ │
-│  │ Back Cam:  [GREEN]  │  │ [Wheels Straight] │  └─────────────────────┘ │
-│  │ Status:    HEALTHY  │  └───────────────────┘                          │
-│  └─────────────────────┘                        [Force Vision Reset    ] │
-│                                                                           │
-└───────────────────────────────────────────────────────────────────────────┘
-```
-
-### Debug Tab Layout
-
-```
-┌───────────────────────────────────────────────────────────────────────────┐
-│  DEBUG TAB                                                    Team XXXX  │
-├───────────────────────────────────────────────────────────────────────────┤
-│                                                                           │
-│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌─────────┐ │
-│  │     POSE        │ │ HEADING LOCK PID│ │     VISION      │ │ SYSTEM  │ │
-│  ├─────────────────┤ ├─────────────────┤ ├─────────────────┤ ├─────────┤ │
-│  │ X:       2.34   │ │ kP:     5.0     │ │ Healthy: [YES]  │ │ Bat:12.4│ │
-│  │ Y:       5.67   │ │ kI:     0.0     │ │ Failures: 0     │ │ CPU: 45 │ │
-│  │ Head:    45.0   │ │ kD:     0.0     │ │ Targets: [YES]  │ │ Brown:NO│ │
-│  │ Rate:    0.0    │ │ Error:  2.3°    │ │ Ambig:   0.03   │ └─────────┘ │
-│  │ Speed:   1.0    │ └─────────────────┘ └─────────────────┘             │
-│  │ FldRel: [YES]   │                                                     │
-│  └─────────────────┘                                                     │
-│                                                                           │
-│  ┌─────────────────────────────────────────────────────────────────────┐ │
-│  │                        TEST COMMANDS                                 │ │
-│  │ [X-Stance] [Full Speed] [Half Speed] [Quarter] [Toggle FR] [Zero H] │ │
-│  └─────────────────────────────────────────────────────────────────────┘ │
-│                                                                           │
-└───────────────────────────────────────────────────────────────────────────┘
-```
-
-### Vision Cal Tab Layout
-
-```
-┌───────────────────────────────────────────────────────────────────────────┐
-│  VISION CAL TAB                                               Team XXXX  │
-├───────────────────────────────────────────────────────────────────────────┤
-│                                                                           │
-│  [Vision Enabled] [Classroom Mode]  HEALTHY  Status    POSE SANE?        │
-│       ON              OFF           [GREEN]  HEALTHY    [GREEN]          │
-│                                                                           │
-│  ┌─────────────────────────────────┐  ┌─────────────┐  ┌─────────────┐   │
-│  │                                 │  │ FUSED POSE  │  │ ODOM ONLY   │   │
-│  │         FIELD VIEW              │  ├─────────────┤  ├─────────────┤   │
-│  │                                 │  │ X:  2.34 m  │  │ Compare:    │   │
-│  │    ┌───┐                        │  │ Y:  5.67 m  │  │  Dist: 0.1m │   │
-│  │    │ ▲ │  ← Robot icon shows    │  │ H:  45.0°   │  │ Gyro Rate:  │   │
-│  │    └───┘    where robot         │  └─────────────┘  │  12.3 °/s   │   │
-│  │             thinks it is!       │                   │ Gyro OK:    │   │
-│  │                                 │  ┌─────────────────│  [YES]      │   │
-│  │    If robot spinning on wrong   │  │ SANITY CHECKS  └─────────────┘   │
-│  │    side = BAD CAMERA TRANSFORM! │  ├─────────────────────────────────┤ │
-│  │                                 │  │ In Field Bounds:    [YES]       │ │
-│  └─────────────────────────────────┘  │ Not Spinning Wild:  [YES]       │ │
-│                                       └─────────────────────────────────┘ │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐               │
-│  │  FRONT CAMERA   │  │   BACK CAMERA   │  │ BEST TARGET │   [Reset]    │
-│  ├─────────────────┤  ├─────────────────┤  ├─────────────┤               │
-│  │ Connected [YES] │  │ Connected [YES] │  │ Tag ID:  5  │  PhotonVision│
-│  │ Has Tgts  [YES] │  │ Has Tgts  [NO ] │  │ Ambig: 0.03 │   :5800      │
-│  │ Count:    2     │  │ Count:    0     │  │ Cam:  front │               │
-│  │ Tags:    1, 5   │  │ Tags:   None    │  │ Fails:   0  │               │
-│  │ Latency: 32 ms  │  │ Latency: -- ms  │  └─────────────┘               │
-│  │ Ambig:   0.03   │  │ Ambig:   --     │                                │
-│  └─────────────────┘  └─────────────────┘                                │
-│                                                                           │
-└───────────────────────────────────────────────────────────────────────────┘
-```
-
-### Vision Cal Tab - Key Diagnostic Features
-
-| Feature | What It Shows | When It's RED |
-|---------|---------------|---------------|
-| **Field View** | Robot position on field map | Robot on wrong side or spinning wildly |
-| **POSE SANE?** | Overall sanity check | Pose outside field OR spinning > 720°/s |
-| **In Field Bounds** | Is pose within field (16.5m x 8m) | Bad camera transform |
-| **Not Spinning Wild** | Gyro rate < 720°/s | Vision causing pose jumps |
-| **Fused Pose** | Combined vision + odometry | Compare to actual robot position |
-
-### How to Debug with Vision Cal Tab
-
-```
-STEP 1: Place robot at known position (against field wall)
-        └── Robot should be stationary
-
-STEP 2: Look at Field View
-        └── Does robot icon match where robot actually is?
-
-STEP 3: Check POSE SANE? indicator
-        └── Should be GREEN
-
-STEP 4: If pose is WRONG:
-        ├── Camera transforms are likely incorrect
-        ├── Re-measure X, Y, Z in VisionConstants.java
-        └── Check camera pitch angle
-
-STEP 5: If robot is SPINNING in Field View:
-        ├── Camera yaw is probably 180° off
-        ├── For back camera: kBackCameraYawRadians = Math.PI
-        └── For front camera: kFrontCameraYawRadians = 0.0
-
-STEP 6: If pose JUMPS when seeing tags:
-        ├── Check camera calibration quality
-        ├── Increase vision StdDevs (trust vision less)
-        └── Lower kMaxAmbiguity threshold
+    │                     NETWORKTABLES                        │
+    │  (Match/*, Drive/*, Vision/*, Hub/*, System/*)          │
+    └────────────────────────┬────────────────────────────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              ▼                             ▼
+    ┌─────────────────┐           ┌─────────────────┐
+    │     ELASTIC     │           │  ADVANTAGESCOPE │
+    │  (Live display) │           │  (Log replay)   │
+    └─────────────────┘           └─────────────────┘
 ```
 
 ---
 
-## Summary
+## NetworkTables Key Reference
 
-| Tool | Use For | Don't Use For |
-|------|---------|---------------|
-| **Shuffleboard** | Live match display | Detailed logging |
-| **AdvantageScope** | Post-match analysis | Real-time feedback |
-| **SmartDashboard** | Data bus between components | Direct viewing |
-| **Logger.recordOutput** | All detailed telemetry | Live display |
+All data is published to NetworkTables via SmartDashboard. Here are the keys organized by namespace:
 
-| Tab | Audience | Widget Count | Style |
-|-----|----------|--------------|-------|
-| Match | Drivers | 6 max | Large, simple |
-| Pit | Pit Crew | ~12 | Health checks |
-| Debug | Programmers | Many | Detailed |
-| Vision Cal | Vision Team | ~20 | Field view + per-camera metrics |
+### Match/* (2026 REBUILT Hub Status)
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Match/HubActive` | Boolean | TRUE if our hub is currently active (can score) |
+| `Match/HubStatus` | String | "ACTIVE", "INACTIVE", or "UNKNOWN" |
+| `Match/NextStatus` | String | "→ ACTIVE", "→ INACTIVE", or "→ ???" |
+| `Match/ShiftCountdown` | Number | Seconds until next shift change |
+| `Match/TimeInPhase` | Number | Seconds elapsed in current phase |
+| `Match/Phase` | String | "Auto", "Transition", "Shift 1-4", "Endgame" |
+| `Match/Warning` | String | Warning message or empty string |
+| `Match/HasWarning` | Boolean | TRUE if a warning is active |
+| `Match/WarningType` | String | "CLEAR", "READY", "CLIMB", or "NONE" |
+| `Match/FmsDataReceived` | Boolean | TRUE once FMS game data arrives |
+| `Match/WeAreFirst` | String | "WE'RE INACTIVE FIRST" or "THEY'RE INACTIVE FIRST" |
+
+### Drive/*
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Drive/SpeedMode` | String | "FULL", "75%", "HALF", or "SLOW" |
+| `Drive/SpeedMultiplier` | Number | 0.0 to 1.0 |
+| `Drive/FieldRelative` | Boolean | TRUE if field-relative driving |
+| `Drive/Heading` | Number | 0-360 degrees |
+| `Drive/PoseX` | Number | X position in meters |
+| `Drive/PoseY` | Number | Y position in meters |
+| `Drive/PoseRotation` | Number | Rotation in degrees |
+| `Drive/TagCount` | Number | Total AprilTags visible |
+| `Drive/HasMultiTag` | Boolean | TRUE if 2+ tags visible |
+| `Drive/PoseInBounds` | Boolean | TRUE if pose is within field |
+| `Drive/PoseSane` | Boolean | TRUE if pose passes sanity checks |
+
+### Hub/*
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Hub/DistanceInches` | Number | Distance to alliance hub in inches |
+| `Hub/InRange` | Boolean | TRUE if in optimal shooting range |
+
+### Vision/*
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Vision/Healthy` | Boolean | TRUE if vision system is working |
+| `Vision/HealthStatus` | String | Detailed status message |
+| `Vision/Enabled` | Boolean | Kill switch (write to disable) |
+| `Vision/AnyTargetsVisible` | Boolean | TRUE if any camera sees tags |
+| `Vision/{Camera}/Connected` | Boolean | Per-camera connection status |
+| `Vision/{Camera}/HasTargets` | Boolean | Per-camera target detection |
+| `Vision/{Camera}/TargetCount` | Number | Tags seen by this camera |
+
+### System/*
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `System/BatteryVoltage` | Number | Battery voltage |
+| `System/BatteryStatus` | String | "GOOD", "OK", or "LOW" |
+| `System/CPUTemp` | Number | RoboRIO CPU temperature |
+| `System/Brownout` | Boolean | TRUE if brownout detected |
 
 ---
 
-*Document created for Team 564 - Dashboard organization guide*
+## Elastic Setup Guide
+
+### Installing Elastic
+
+1. Download Elastic from: https://github.com/Gold872/elastic-dashboard
+2. Install and run Elastic
+3. Connect to your robot (or simulation) via NetworkTables
+
+### Creating Your Match Layout
+
+In Elastic, create widgets that read the NetworkTables keys above:
+
+**Recommended Match Layout:**
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│  MATCH DASHBOARD - 2026 REBUILT                               Team 5684  │
+├───────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ┌─────────────────────┐  ┌──────────────┐  ┌──────────────────────────┐ │
+│  │                     │  │   SHIFT IN   │  │       PHASE              │ │
+│  │     OUR HUB         │  │              │  │      Shift 2             │ │
+│  │    [ACTIVE]         │  │     18       │  ├──────────────────────────┤ │
+│  │                     │  │              │  │     FMS DATA             │ │
+│  │  Match/HubActive    │  │ Match/Shift  │  │      [GREEN]             │ │
+│  │                     │  │  Countdown   │  │                          │ │
+│  └─────────────────────┘  └──────────────┘  └──────────────────────────┘ │
+│                                                                           │
+│  ┌──────────────────────────────────────────────────────────────────────┐│
+│  │                                                                       ││
+│  │   ⚠️  CLEAR ZONE!                              Match/Warning          ││
+│  │                                                                       ││
+│  └──────────────────────────────────────────────────────────────────────┘│
+│                                                                           │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌─────────┐│
+│  │   AUTO     │ │  VISION    │ │  HUB DIST  │ │  IN RANGE  │ │  BATT   ││
+│  │ [Chooser]  │ │  [GREEN]   │ │    72"     │ │  [GREEN]   │ │  12.4V  ││
+│  │            │ │            │ │            │ │            │ │         ││
+│  │Auto Selector│Vision/Healthy│Hub/Distance │ Hub/InRange │ System/  ││
+│  │            │ │            │ │  Inches    │ │            │ Battery  ││
+│  └────────────┘ └────────────┘ └────────────┘ └────────────┘ └─────────┘│
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### Widget Configuration Tips
+
+1. **Boolean indicators**: Use color coding
+   - `Match/HubActive`: Green when TRUE, Red when FALSE
+   - `Vision/Healthy`: Green when TRUE, Red when FALSE
+   - `Match/HasWarning`: Orange when TRUE, Dark when FALSE
+
+2. **Warning banner**: Make it LARGE and center it
+   - Read from `Match/Warning`
+   - Use `Match/WarningType` to set colors:
+     - "CLEAR" = Orange
+     - "READY" = Yellow
+     - "CLIMB" = Red
+     - "NONE" = Hidden/Dark
+
+3. **Countdown**: Use a large number display
+   - Read from `Match/ShiftCountdown`
+   - Consider a radial gauge (0-30 range)
+
+---
+
+## AdvantageScope Usage
+
+### Viewing Logs
+
+1. Run your robot (real or simulation)
+2. Log files are saved to USB drive on RoboRIO
+3. Open log file in AdvantageScope
+
+### Recommended AdvantageScope Views
+
+**Pose Visualization:**
+- Add `Drive/Pose` as a "Robot" object on the 2D field
+- Add `Vision/Summary/TagPoses` as "Vision Target" objects
+- Add `Vision/Summary/RobotPosesAccepted` as green "Ghost" objects
+- Add `Vision/Summary/RobotPosesRejected` as red "Ghost" objects
+
+**Match Analysis:**
+- Graph `Match/ShiftCountdown` to see timing
+- Graph `Hub/DistanceInches` to analyze positioning
+- Overlay with `Match/HubActive` to correlate scoring windows
+
+**Vision Debugging:**
+- Compare `Drive/PoseX/Y` with vision estimates
+- Look for jumps when `Vision/*/RobotPosesRejected` is populated
+- Check `Vision/*/Ambiguity` values at problem moments
+
+---
+
+## 2026 REBUILT Match Dashboard
+
+### Game Context
+
+The REBUILT game has alternating hub activation:
+- **AUTO (20s)**: Both hubs active
+- **TRANSITION (10s)**: Both hubs active, FMS data arrives
+- **SHIFTS 1-4 (25s each)**: Alternating hub activation
+- **ENDGAME (30s)**: Both hubs active, focus on climbing
+
+### Warning System
+
+| Warning | NetworkTables Key Value | Driver Action |
+|---------|------------------------|---------------|
+| `Match/Warning = "CLEAR ZONE!"` | Hub closing in 9s | Flush fuel, exit zone |
+| `Match/Warning = "GET READY!"` | Hub opening in 9s | Position to score |
+| `Match/Warning = "ENDGAME SOON"` | 30s remaining | Prepare climb |
+| `Match/Warning = "CLIMB NOW!"` | 15s remaining | Execute climb |
+| `Match/Warning = "GO GO GO!"` | 5s remaining | Emergency climb |
+
+### FMS Data
+
+The game-specific message ('R' or 'B') indicates which alliance's hub is inactive during Shifts 1 & 3:
+- Arrives ~3 seconds after Auto ends
+- `Match/FmsDataReceived` turns TRUE when received
+- `Match/WeAreFirst` shows strategic positioning info
+
+---
+
+## Testing at Home (Simulation)
+
+You can test the dashboard without hardware:
+
+```bash
+./gradlew simulateJava
+```
+
+Then:
+1. Open Elastic and connect to `localhost`
+2. Use the WPILib Simulation GUI to control match state
+3. Call `matchStateTracker.setFmsDataForTesting('R')` to simulate FMS data
+
+---
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `DashboardSetup.java` | Publishes all data to NetworkTables |
+| `MatchStateTracker.java` | Calculates hub status, phases, warnings |
+| `MatchConstants.java` | Timing values for match phases |
+| `DriveSubsystem.java` | Publishes drive and hub distance data |
+| `VisionSubsystem.java` | Publishes vision health and target data |
+
+---
+
+*Document created for Team 5684 - Elastic + AdvantageScope dashboard guide for 2026 REBUILT*
