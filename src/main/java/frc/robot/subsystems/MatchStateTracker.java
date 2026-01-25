@@ -8,6 +8,7 @@ import org.littletonrobotics.junction.Logger;
 
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.constants.MatchConstants;
@@ -114,6 +115,14 @@ public class MatchStateTracker extends SubsystemBase {
     private WarningLevel currentWarning = WarningLevel.NONE;
 
     // =========================================================================
+    // PRACTICE MODE STATE
+    // =========================================================================
+
+    private boolean practiceMode = false;
+    private double practiceStartTime = 0;
+    private boolean practiceWeAreInactiveFirst = true; // Configurable for practice
+
+    // =========================================================================
     // CONSTRUCTOR
     // =========================================================================
 
@@ -127,6 +136,11 @@ public class MatchStateTracker extends SubsystemBase {
         SmartDashboard.putString("Match/Warning", "");
         SmartDashboard.putBoolean("Match/FmsDataReceived", false);
         SmartDashboard.putString("Match/FirstInactive", "WAITING...");
+
+        // Practice mode controls
+        SmartDashboard.putBoolean("Practice/Enabled", false);
+        SmartDashboard.putBoolean("Practice/WeAreInactiveFirst", true);
+        SmartDashboard.putBoolean("Practice/Restart", false);
     }
 
     // =========================================================================
@@ -180,15 +194,24 @@ public class MatchStateTracker extends SubsystemBase {
         // Update alliance
         ourAlliance = DriverStation.getAlliance().orElse(Alliance.Blue);
 
-        // Poll for FMS data if not yet received
-        if (!fmsDataReceived) {
-            pollFmsData();
-        }
+        // Check practice mode controls from dashboard
+        checkPracticeModeControls();
 
-        // Calculate current state
-        updateMatchPhase();
-        updateHubStatus();
-        updateWarnings();
+        if (practiceMode) {
+            // Practice mode: use internal timer and simulate shifts
+            updatePracticeMode();
+        } else {
+            // Normal match mode
+            // Poll for FMS data if not yet received
+            if (!fmsDataReceived) {
+                pollFmsData();
+            }
+
+            // Calculate current state
+            updateMatchPhase();
+            updateHubStatus();
+            updateWarnings();
+        }
 
         // Update dashboard
         updateDashboard();
@@ -425,18 +448,29 @@ public class MatchStateTracker extends SubsystemBase {
      * Updates SmartDashboard with current match state.
      */
     private void updateDashboard() {
-        SmartDashboard.putString("Match/Phase", currentPhase.getDisplayName());
+        // Add practice mode indicator to phase display
+        String phaseDisplay = currentPhase.getDisplayName();
+        if (practiceMode) {
+            phaseDisplay = "[PRACTICE] " + phaseDisplay;
+        }
+
+        SmartDashboard.putString("Match/Phase", phaseDisplay);
         SmartDashboard.putString("Match/HubStatus", ourHubStatus.getDisplayName());
         SmartDashboard.putString("Match/NextStatus", nextHubStatus.getDisplayName());
         SmartDashboard.putNumber("Match/TimeInPhase", timeInPhase);
         SmartDashboard.putNumber("Match/TimeUntilShift", timeUntilNextShift);
         SmartDashboard.putString("Match/Warning", currentWarning.getMessage());
-        SmartDashboard.putBoolean("Match/FmsDataReceived", fmsDataReceived);
+        SmartDashboard.putBoolean("Match/FmsDataReceived", fmsDataReceived || practiceMode);
         SmartDashboard.putBoolean("Match/HubActive", ourHubStatus == HubStatus.ACTIVE);
         SmartDashboard.putBoolean("Match/HasWarning", currentWarning != WarningLevel.NONE);
+        SmartDashboard.putBoolean("Match/PracticeMode", practiceMode);
 
         // Show which alliance is inactive first (once known)
-        if (fmsDataReceived) {
+        if (practiceMode) {
+            SmartDashboard.putString("Match/FirstInactive", practiceWeAreInactiveFirst ? "US" : "THEM");
+            SmartDashboard.putString("Match/WeAreFirst",
+                practiceWeAreInactiveFirst ? "WE'RE INACTIVE FIRST" : "THEY'RE INACTIVE FIRST");
+        } else if (fmsDataReceived) {
             String firstInactive = (fmsInactiveCode == MatchConstants.kRedInactiveCode) ? "RED" : "BLUE";
             SmartDashboard.putString("Match/FirstInactive", firstInactive);
 
@@ -463,6 +497,132 @@ public class MatchStateTracker extends SubsystemBase {
         Logger.recordOutput("Match/FmsDataReceived", fmsDataReceived);
         Logger.recordOutput("Match/HubActive", ourHubStatus == HubStatus.ACTIVE);
         Logger.recordOutput("Match/Alliance", ourAlliance.toString());
+        Logger.recordOutput("Match/PracticeMode", practiceMode);
+    }
+
+    // =========================================================================
+    // PRACTICE MODE
+    // =========================================================================
+
+    /**
+     * Checks dashboard controls for practice mode.
+     */
+    private void checkPracticeModeControls() {
+        boolean enableRequested = SmartDashboard.getBoolean("Practice/Enabled", false);
+        boolean restartRequested = SmartDashboard.getBoolean("Practice/Restart", false);
+        practiceWeAreInactiveFirst = SmartDashboard.getBoolean("Practice/WeAreInactiveFirst", true);
+
+        // Handle restart button
+        if (restartRequested) {
+            SmartDashboard.putBoolean("Practice/Restart", false);
+            if (practiceMode) {
+                practiceStartTime = Timer.getFPGATimestamp();
+                System.out.println("PRACTICE MODE: Restarted");
+            }
+        }
+
+        // Handle enable/disable
+        if (enableRequested && !practiceMode) {
+            startPracticeMode();
+        } else if (!enableRequested && practiceMode) {
+            stopPracticeMode();
+        }
+    }
+
+    /**
+     * Starts practice mode - simulates teleop shift timing on a loop.
+     */
+    public void startPracticeMode() {
+        practiceMode = true;
+        practiceStartTime = Timer.getFPGATimestamp();
+        SmartDashboard.putBoolean("Practice/Enabled", true);
+        System.out.println("PRACTICE MODE: Started - Get ready for shift timing practice!");
+        System.out.println("PRACTICE MODE: We are " +
+            (practiceWeAreInactiveFirst ? "INACTIVE" : "ACTIVE") + " first");
+    }
+
+    /**
+     * Stops practice mode and returns to normal operation.
+     */
+    public void stopPracticeMode() {
+        practiceMode = false;
+        SmartDashboard.putBoolean("Practice/Enabled", false);
+        System.out.println("PRACTICE MODE: Stopped");
+
+        // Reset to pre-match state
+        currentPhase = MatchPhase.PRE_MATCH;
+        ourHubStatus = HubStatus.UNKNOWN;
+        nextHubStatus = HubStatus.UNKNOWN;
+    }
+
+    /**
+     * Returns true if practice mode is active.
+     */
+    public boolean isPracticeMode() {
+        return practiceMode;
+    }
+
+    /**
+     * Updates match state during practice mode using internal timer.
+     * Cycles through: Shift 1 → Shift 2 → Shift 3 → Shift 4 → (repeat)
+     */
+    private void updatePracticeMode() {
+        double elapsed = Timer.getFPGATimestamp() - practiceStartTime;
+
+        // Total cycle time: 4 shifts × 25 seconds = 100 seconds
+        double cycleTime = 4 * MatchConstants.kShiftDurationSeconds;
+        double timeInCycle = elapsed % cycleTime;
+
+        // Determine which shift we're in
+        int shiftNumber = (int) (timeInCycle / MatchConstants.kShiftDurationSeconds) + 1;
+        double timeIntoShift = timeInCycle % MatchConstants.kShiftDurationSeconds;
+        double timeUntilShiftEnd = MatchConstants.kShiftDurationSeconds - timeIntoShift;
+
+        // Set phase
+        switch (shiftNumber) {
+            case 1:
+                currentPhase = MatchPhase.SHIFT_1;
+                break;
+            case 2:
+                currentPhase = MatchPhase.SHIFT_2;
+                break;
+            case 3:
+                currentPhase = MatchPhase.SHIFT_3;
+                break;
+            case 4:
+            default:
+                currentPhase = MatchPhase.SHIFT_4;
+                break;
+        }
+
+        timeInPhase = timeIntoShift;
+        timeUntilNextShift = timeUntilShiftEnd;
+
+        // Calculate hub status based on practice settings
+        // Odd shifts (1 & 3): We are inactive if practiceWeAreInactiveFirst is true
+        // Even shifts (2 & 4): Opposite
+        boolean isOddShift = (shiftNumber == 1 || shiftNumber == 3);
+
+        if (isOddShift) {
+            ourHubStatus = practiceWeAreInactiveFirst ? HubStatus.INACTIVE : HubStatus.ACTIVE;
+        } else {
+            ourHubStatus = practiceWeAreInactiveFirst ? HubStatus.ACTIVE : HubStatus.INACTIVE;
+        }
+
+        // Calculate next hub status
+        boolean nextIsOddShift = (shiftNumber == 4 || shiftNumber == 2);
+        if (nextIsOddShift) {
+            nextHubStatus = practiceWeAreInactiveFirst ? HubStatus.INACTIVE : HubStatus.ACTIVE;
+        } else {
+            nextHubStatus = practiceWeAreInactiveFirst ? HubStatus.ACTIVE : HubStatus.INACTIVE;
+        }
+
+        // Calculate warnings (same logic as normal mode)
+        updateWarnings();
+
+        // Log practice cycle info
+        SmartDashboard.putNumber("Practice/CycleNumber", (int) (elapsed / cycleTime) + 1);
+        SmartDashboard.putNumber("Practice/TotalElapsed", elapsed);
     }
 
     // =========================================================================

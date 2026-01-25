@@ -133,6 +133,13 @@ public final class HardwareConstants {
   public static final int kCoDriverControllerPort = 2;
 
   // ═══════════════════════════════════════════════════════════════════════
+  // LED CONTROLLER
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /** REV Blink LED controller PWM port. */
+  public static final int kLEDControllerPWMPort = 9;
+
+  // ═══════════════════════════════════════════════════════════════════════
   // DERIVED CONSTANTS (Auto-calculated)
   // ═══════════════════════════════════════════════════════════════════════
 

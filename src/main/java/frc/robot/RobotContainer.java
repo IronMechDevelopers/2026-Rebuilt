@@ -25,6 +25,8 @@ import frc.robot.constants.HardwareConstants;
 import frc.robot.subsystems.DriveSubsystem;
 import frc.robot.subsystems.MatchStateTracker;
 import frc.robot.subsystems.VisionProvider;
+import frc.robot.subsystems.led.LEDSubsystem;
+import frc.robot.subsystems.led.REVBlinkController;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -64,6 +66,12 @@ public class RobotContainer {
 
   /** Match state tracker - Tracks hub status and shift timing for 2026 REBUILT */
   private final MatchStateTracker matchState = new MatchStateTracker();
+
+  /** LED subsystem - Communicates match state visually to drive team */
+  private final LEDSubsystem leds = new LEDSubsystem(
+      new REVBlinkController(HardwareConstants.kLEDControllerPWMPort),
+      matchState
+  );
 
   // =========================================================================
   // CONTROLLERS
@@ -191,6 +199,15 @@ public class RobotContainer {
    */
   public MatchStateTracker getMatchStateTracker() {
     return matchState;
+  }
+
+  /**
+   * Gets LED subsystem instance.
+   *
+   * @return LED subsystem
+   */
+  public LEDSubsystem getLEDSubsystem() {
+    return leds;
   }
 
   /**
