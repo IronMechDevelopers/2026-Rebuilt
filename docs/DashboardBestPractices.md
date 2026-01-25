@@ -126,6 +126,27 @@ All data is published to NetworkTables via SmartDashboard. Here are the keys org
 | `Match/WarningType` | String | "CLEAR", "READY", "CLIMB", or "NONE" |
 | `Match/FmsDataReceived` | Boolean | TRUE once FMS game data arrives |
 | `Match/WeAreFirst` | String | "WE'RE INACTIVE FIRST" or "THEY'RE INACTIVE FIRST" |
+| `Match/PracticeMode` | Boolean | TRUE when practice mode is active |
+
+### Practice/* (Shift Timing Training)
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Practice/Enabled` | Boolean | Toggle to start/stop practice mode (writable) |
+| `Practice/WeAreInactiveFirst` | Boolean | Configure which scenario to practice (writable) |
+| `Practice/Restart` | Boolean | Tap TRUE to restart from Shift 1 (writable) |
+| `Practice/CycleNumber` | Number | How many times through all 4 shifts |
+| `Practice/TotalElapsed` | Number | Total seconds since practice started |
+
+### LED/*
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `LED/State` | String | Current LED state description |
+| `LED/Pattern` | String | Current pattern type (SOLID, BLINK, etc.) |
+| `LED/Color` | String | Primary color name |
+| `LED/HasInterrupt` | Boolean | TRUE if temporary interrupt is active |
+| `LED/Connected` | Boolean | Hardware connection status |
 
 ### Drive/*
 
@@ -296,6 +317,55 @@ The game-specific message ('R' or 'B') indicates which alliance's hub is inactiv
 
 ---
 
+## Practice Mode (Shift Timing Training)
+
+Practice mode lets your team train on the 25-second shift timing without running full matches.
+
+### Starting Practice Mode
+
+1. Open Elastic dashboard
+2. Set `Practice/WeAreInactiveFirst` to configure the scenario:
+   - **TRUE** = We're inactive in Shifts 1 & 3 (practice defense positioning)
+   - **FALSE** = We're active in Shifts 1 & 3 (practice scoring windows)
+3. Toggle `Practice/Enabled` to **TRUE**
+4. Practice starts immediately - no need to enable the robot!
+
+### What Happens
+
+```
+PRACTICE MODE CYCLE (100 seconds, loops forever)
+═══════════════════════════════════════════════════════════════════════════════
+
+    Shift 1 (25s)     Shift 2 (25s)     Shift 3 (25s)     Shift 4 (25s)
+  ┌───────────────┐ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
+  │   INACTIVE    │ │    ACTIVE     │ │   INACTIVE    │ │    ACTIVE     │
+  │  (if first)   │ │               │ │  (if first)   │ │               │
+  └───────────────┘ └───────────────┘ └───────────────┘ └───────────────┘
+        │                 │                 │                 │
+        └─────────────────┴─────────────────┴─────────────────┘
+                                    │
+                              LOOPS BACK TO
+                                SHIFT 1
+```
+
+### LEDs and Warnings Work Normally
+
+- LEDs show the same patterns as a real match
+- Warnings fire at the same timing (9s before shift, 3s before shift)
+- Dashboard shows `[PRACTICE]` prefix on phase name
+
+### Restarting Practice
+
+- Set `Practice/Restart` to TRUE to jump back to Shift 1
+- Useful for repeating a specific transition
+
+### Stopping Practice
+
+- Toggle `Practice/Enabled` to FALSE
+- Returns to normal pre-match state
+
+---
+
 ## Testing at Home (Simulation)
 
 You can test the dashboard without hardware:
@@ -307,7 +377,8 @@ You can test the dashboard without hardware:
 Then:
 1. Open Elastic and connect to `localhost`
 2. Use the WPILib Simulation GUI to control match state
-3. Call `matchStateTracker.setFmsDataForTesting('R')` to simulate FMS data
+3. Use Practice Mode to test shift timing (toggle `Practice/Enabled`)
+4. Or call `matchStateTracker.setFmsDataForTesting('R')` to simulate FMS data
 
 ---
 
@@ -316,10 +387,18 @@ Then:
 | File | Purpose |
 |------|---------|
 | `DashboardSetup.java` | Publishes all data to NetworkTables |
-| `MatchStateTracker.java` | Calculates hub status, phases, warnings |
+| `MatchStateTracker.java` | Calculates hub status, phases, warnings, practice mode |
 | `MatchConstants.java` | Timing values for match phases |
 | `DriveSubsystem.java` | Publishes drive and hub distance data |
 | `VisionSubsystem.java` | Publishes vision health and target data |
+| `LEDSubsystem.java` | LED control with match state integration |
+| `LEDSystem.md` | Complete LED system documentation |
+
+---
+
+## Related Documentation
+
+- **[LEDSystem.md](LEDSystem.md)** - Complete LED system guide including hardware setup, interrupt system, and customization
 
 ---
 
