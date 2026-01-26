@@ -5,7 +5,11 @@
 package frc.robot.config;
 
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.networktables.GenericEntry;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
+import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -18,44 +22,14 @@ import frc.robot.subsystems.MatchStateTracker.HubStatus;
 import frc.robot.subsystems.MatchStateTracker.WarningLevel;
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- *                           DASHBOARD SETUP
- * ═══════════════════════════════════════════════════════════════════════════
+ * Configures Shuffleboard tabs and widgets following the 4-dashboard structure.
  *
- * Publishes robot data to NetworkTables for display in Elastic and AdvantageScope.
- *
- * <h2>DASHBOARD PHILOSOPHY (2026+)</h2>
+ * <h2>TABS</h2>
  * <ul>
- *   <li><b>Elastic</b> = Live dashboard during matches (you design layout in Elastic)</li>
- *   <li><b>AdvantageScope</b> = Post-match log analysis and 3D visualization</li>
- *   <li><b>NetworkTables/SmartDashboard</b> = Data bus (code publishes, dashboards read)</li>
- * </ul>
- *
- * <h2>HOW IT WORKS</h2>
- * <ol>
- *   <li>This class publishes all robot data to SmartDashboard keys</li>
- *   <li>Elastic reads those keys and displays them (layout configured in Elastic)</li>
- *   <li>AdvantageKit logs data for AdvantageScope replay</li>
- * </ol>
- *
- * <h2>KEY NAMESPACES</h2>
- * <table>
- *   <tr><th>Namespace</th><th>Purpose</th></tr>
- *   <tr><td>Match/*</td><td>Hub status, phase, warnings (2026 REBUILT game)</td></tr>
- *   <tr><td>Drive/*</td><td>Speed, heading, field-relative status</td></tr>
- *   <tr><td>Vision/*</td><td>Camera status, targets, health</td></tr>
- *   <tr><td>Hub/*</td><td>Distance to hub, in-range status</td></tr>
- *   <tr><td>System/*</td><td>Battery, CPU, brownout</td></tr>
- * </table>
- *
- * <h2>ELASTIC SETUP</h2>
- * <p>In Elastic, create widgets that read these NetworkTables keys.
- * Recommended Match layout:
- * <ul>
- *   <li>Large boolean box for "Match/HubActive" (green/red)</li>
- *   <li>Text display for "Match/Warning" (warning messages)</li>
- *   <li>Number display for "Match/ShiftCountdown"</li>
- *   <li>Auto chooser for "Auto Selector"</li>
+ *   <li><b>Match</b> - Drive team during competition</li>
+ *   <li><b>Pit</b> - Pit crew between matches</li>
+ *   <li><b>Vision</b> - Vision tuning</li>
+ *   <li><b>Software</b> - Programmers</li>
  * </ul>
  */
 public class DashboardSetup {
@@ -64,20 +38,60 @@ public class DashboardSetup {
   private final MatchStateTracker matchStateTracker;
   private final SendableChooser<Command> autoChooser;
 
-  // Camera keys for reading from SmartDashboard
-  private final String frontKey;
-  private final String backKey;
+  // Camera keys
+  private final String frontCameraKey;
+  private final String backCameraKey;
 
-  // Field visualization (works in both Elastic and AdvantageScope)
-  private final Field2d field = new Field2d();
+  // Field visualizations (one per tab - can't share Sendables)
+  private final Field2d matchField = new Field2d();
 
-  /**
-   * Creates dashboard setup.
-   *
-   * @param driveSubsystem    The drive subsystem
-   * @param matchStateTracker The match state tracker (for hub status)
-   * @param autoChooser       The autonomous selector
-   */
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MATCH TAB
+  // ═══════════════════════════════════════════════════════════════════════════
+  private GenericEntry matchHubActive;
+  private GenericEntry matchHubStatus;
+  private GenericEntry matchShiftCountdown;
+  private GenericEntry matchPhase;
+  private GenericEntry matchWarning;
+  private GenericEntry matchBattery;
+  private GenericEntry matchVisionHealthy;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PIT TAB
+  // ═══════════════════════════════════════════════════════════════════════════
+  private GenericEntry pitBattery;
+  private GenericEntry pitBatteryStatus;
+  private GenericEntry pitVisionHealthy;
+  private GenericEntry pitCameraCount;
+  private GenericEntry pitCanUtil;
+  private GenericEntry pitSetWheelsStraight;
+  private GenericEntry pitZeroHeading;
+  private GenericEntry pitCoastMode;
+  private GenericEntry pitBrakeMode;
+  private GenericEntry pitVisionReset;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VISION TAB
+  // ═══════════════════════════════════════════════════════════════════════════
+  private GenericEntry visionHealthy;
+  private GenericEntry visionEnabled;
+  private GenericEntry visionTotalTags;
+  private GenericEntry visionAccepted;
+  private GenericEntry visionRejected;
+  private GenericEntry visionFrontConnected;
+  private GenericEntry visionFrontTargets;
+  private GenericEntry visionBackConnected;
+  private GenericEntry visionBackTargets;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SOFTWARE TAB
+  // ═══════════════════════════════════════════════════════════════════════════
+  private GenericEntry softwareBattery;
+  private GenericEntry softwareBrownout;
+  private GenericEntry softwareCanUtil;
+  private GenericEntry softwarePracticeEnabled;
+  private GenericEntry softwareClassroomMode;
+
   public DashboardSetup(
       DriveSubsystem driveSubsystem,
       MatchStateTracker matchStateTracker,
@@ -85,235 +99,202 @@ public class DashboardSetup {
     this.driveSubsystem = driveSubsystem;
     this.matchStateTracker = matchStateTracker;
     this.autoChooser = autoChooser;
-    this.frontKey = "Vision/" + VisionConstants.kFrontCameraName;
-    this.backKey = "Vision/" + VisionConstants.kBackCameraName;
+    this.frontCameraKey = "Vision/" + VisionConstants.kFrontCameraName;
+    this.backCameraKey = "Vision/" + VisionConstants.kBackCameraName;
   }
 
   /**
-   * Initializes dashboard defaults.
-   * Call once from RobotContainer after creating all subsystems.
+   * Configures all dashboard tabs.
    */
   public void configureAll() {
-    // Publish auto chooser
-    SmartDashboard.putData("Auto Selector", autoChooser);
+    System.out.println("DashboardSetup: Starting configuration...");
 
-    // Publish field visualization
-    SmartDashboard.putData("Field", field);
+    try {
+      configureMatchTab();
+      System.out.println("DashboardSetup: Match tab configured");
+    } catch (Exception e) {
+      DriverStation.reportError("DashboardSetup: Match tab failed: " + e.getMessage(), e.getStackTrace());
+    }
 
-    // Initialize default values
+    try {
+      configurePitTab();
+      System.out.println("DashboardSetup: Pit tab configured");
+    } catch (Exception e) {
+      DriverStation.reportError("DashboardSetup: Pit tab failed: " + e.getMessage(), e.getStackTrace());
+    }
+
+    try {
+      configureVisionTab();
+      System.out.println("DashboardSetup: Vision tab configured");
+    } catch (Exception e) {
+      DriverStation.reportError("DashboardSetup: Vision tab failed: " + e.getMessage(), e.getStackTrace());
+    }
+
+    try {
+      configureSoftwareTab();
+      System.out.println("DashboardSetup: Software tab configured");
+    } catch (Exception e) {
+      DriverStation.reportError("DashboardSetup: Software tab failed: " + e.getMessage(), e.getStackTrace());
+    }
+
+    // Initialize defaults
     SmartDashboard.putBoolean("Vision/Enabled", true);
     SmartDashboard.putBoolean("Vision/ClassroomMode", false);
 
-    // Initialize Pit Mode command buttons (all false by default)
-    SmartDashboard.putBoolean("Pit/SetWheelsStraight", false);
-    SmartDashboard.putBoolean("Pit/ZeroHeading", false);
-    SmartDashboard.putBoolean("Pit/CoastMode", false);
-    SmartDashboard.putBoolean("Pit/BrakeMode", false);
-    SmartDashboard.putBoolean("Pit/ForceVisionReset", false);
+    System.out.println("DashboardSetup: All tabs configured successfully!");
+  }
+
+  private void configureMatchTab() {
+    ShuffleboardTab tab = Shuffleboard.getTab("Match");
+
+    // Core match info
+    matchHubActive = tab.add("Hub Active", false).withPosition(0, 0).withSize(2, 2).getEntry();
+    matchHubStatus = tab.add("Hub Status", "---").withPosition(2, 0).withSize(2, 1).getEntry();
+    matchShiftCountdown = tab.add("Shift In (sec)", 0).withPosition(4, 0).withSize(2, 1).getEntry();
+    matchPhase = tab.add("Phase", "---").withPosition(2, 1).withSize(2, 1).getEntry();
+    matchWarning = tab.add("Warning", "").withPosition(0, 2).withSize(4, 1).getEntry();
+
+    // Status indicators
+    matchBattery = tab.add("Battery V", 0.0).withPosition(4, 1).withSize(1, 1).getEntry();
+    matchVisionHealthy = tab.add("Vision OK", false).withPosition(5, 1).withSize(1, 1).getEntry();
+
+    // Auto chooser and field
+    tab.add("Auto Selector", autoChooser).withPosition(0, 3).withSize(3, 1);
+    tab.add("Field", matchField).withPosition(3, 2).withSize(4, 3);
+  }
+
+  private void configurePitTab() {
+    ShuffleboardTab tab = Shuffleboard.getTab("Pit");
+
+    // System status row
+    pitBattery = tab.add("Battery V", 0.0).withPosition(0, 0).withSize(1, 1).getEntry();
+    pitBatteryStatus = tab.add("Battery", "---").withPosition(1, 0).withSize(1, 1).getEntry();
+    pitVisionHealthy = tab.add("Vision OK", false).withPosition(2, 0).withSize(1, 1).getEntry();
+    pitCameraCount = tab.add("Cameras", 0).withPosition(3, 0).withSize(1, 1).getEntry();
+    pitCanUtil = tab.add("CAN %", 0.0).withPosition(4, 0).withSize(1, 1).getEntry();
+
+    // Command buttons
+    pitSetWheelsStraight = tab.add("Wheels Straight", false).withPosition(0, 1).withSize(2, 1).getEntry();
+    pitZeroHeading = tab.add("Zero Heading", false).withPosition(2, 1).withSize(2, 1).getEntry();
+    pitCoastMode = tab.add("Coast Mode", false).withPosition(0, 2).withSize(2, 1).getEntry();
+    pitBrakeMode = tab.add("Brake Mode", false).withPosition(2, 2).withSize(2, 1).getEntry();
+    pitVisionReset = tab.add("Vision Reset", false).withPosition(4, 1).withSize(2, 1).getEntry();
+  }
+
+  private void configureVisionTab() {
+    ShuffleboardTab tab = Shuffleboard.getTab("Vision");
+
+    // Overall status
+    visionHealthy = tab.add("Healthy", false).withPosition(0, 0).withSize(1, 1).getEntry();
+    visionEnabled = tab.add("Enabled", true).withPosition(1, 0).withSize(1, 1).getEntry();
+    visionTotalTags = tab.add("Total Tags", 0).withPosition(2, 0).withSize(1, 1).getEntry();
+    visionAccepted = tab.add("Accepted", 0).withPosition(3, 0).withSize(1, 1).getEntry();
+    visionRejected = tab.add("Rejected", 0).withPosition(4, 0).withSize(1, 1).getEntry();
+
+    // Per-camera status
+    visionFrontConnected = tab.add("Front Connected", false).withPosition(0, 1).withSize(2, 1).getEntry();
+    visionFrontTargets = tab.add("Front Targets", 0).withPosition(2, 1).withSize(1, 1).getEntry();
+    visionBackConnected = tab.add("Back Connected", false).withPosition(0, 2).withSize(2, 1).getEntry();
+    visionBackTargets = tab.add("Back Targets", 0).withPosition(2, 2).withSize(1, 1).getEntry();
+  }
+
+  private void configureSoftwareTab() {
+    ShuffleboardTab tab = Shuffleboard.getTab("Software");
+
+    // System info
+    softwareBattery = tab.add("Battery V", 0.0).withPosition(0, 0).withSize(1, 1).getEntry();
+    softwareBrownout = tab.add("Brownout", false).withPosition(1, 0).withSize(1, 1).getEntry();
+    softwareCanUtil = tab.add("CAN %", 0.0).withPosition(2, 0).withSize(1, 1).getEntry();
+
+    // Mode toggles
+    softwarePracticeEnabled = tab.add("Practice Mode", false).withPosition(0, 1).withSize(2, 1).getEntry();
+    softwareClassroomMode = tab.add("Classroom Mode", false).withPosition(2, 1).withSize(2, 1).getEntry();
   }
 
   /**
-   * Updates all dashboard values.
-   * Call this from Robot.robotPeriodic().
+   * Updates all dashboard values. Call from Robot.robotPeriodic().
    */
   public void periodic() {
-    // ═══════════════════════════════════════════════════════════════════════
-    // PIT MODE COMMANDS (check for button presses)
-    // ═══════════════════════════════════════════════════════════════════════
+    // Check pit commands first
     checkPitCommands();
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // MATCH STATE (2026 REBUILT - Hub status and warnings)
-    // ═══════════════════════════════════════════════════════════════════════
-    updateMatchState();
+    // Update all tabs
+    updateMatchTab();
+    updatePitTab();
+    updateVisionTab();
+    updateSoftwareTab();
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // DRIVE STATUS
-    // ═══════════════════════════════════════════════════════════════════════
-    updateDriveStatus();
+    // Update field
+    matchField.setRobotPose(driveSubsystem.getCurrentPose());
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // SYSTEM STATUS
-    // ═══════════════════════════════════════════════════════════════════════
-    updateSystemStatus();
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // FIELD VISUALIZATION
-    // ═══════════════════════════════════════════════════════════════════════
-    field.setRobotPose(driveSubsystem.getCurrentPose());
+    // Sync toggles to SmartDashboard for other systems
+    SmartDashboard.putBoolean("Vision/Enabled", visionEnabled.getBoolean(true));
+    SmartDashboard.putBoolean("Vision/ClassroomMode", softwareClassroomMode.getBoolean(false));
+    SmartDashboard.putBoolean("Practice/Enabled", softwarePracticeEnabled.getBoolean(false));
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // MATCH STATE (2026 REBUILT game-specific)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  private void updateMatchState() {
-    // Hub status - THE most critical info
+  private void updateMatchTab() {
     HubStatus hubStatus = matchStateTracker.getOurHubStatus();
-    SmartDashboard.putBoolean("Match/HubActive", hubStatus == HubStatus.ACTIVE);
-    SmartDashboard.putString("Match/HubStatus", hubStatus.getDisplayName());
+    matchHubActive.setBoolean(hubStatus == HubStatus.ACTIVE);
+    matchHubStatus.setString(hubStatus.getDisplayName());
+    matchShiftCountdown.setDouble(Math.ceil(matchStateTracker.getTimeUntilNextShift()));
+    matchPhase.setString(matchStateTracker.getCurrentPhase().getDisplayName());
 
-    // Next status
-    HubStatus nextStatus = matchStateTracker.getNextHubStatus();
-    String nextDisplay = switch (nextStatus) {
-      case ACTIVE -> "→ ACTIVE";
-      case INACTIVE -> "→ INACTIVE";
-      default -> "→ ???";
-    };
-    SmartDashboard.putString("Match/NextStatus", nextDisplay);
-
-    // Timing
-    SmartDashboard.putNumber("Match/ShiftCountdown", Math.ceil(matchStateTracker.getTimeUntilNextShift()));
-    SmartDashboard.putNumber("Match/TimeInPhase", matchStateTracker.getTimeInPhase());
-    SmartDashboard.putString("Match/Phase", matchStateTracker.getCurrentPhase().getDisplayName());
-
-    // Warnings - This is what drives team action
     WarningLevel warning = matchStateTracker.getCurrentWarning();
-    SmartDashboard.putString("Match/Warning", warning.getMessage());
-    SmartDashboard.putBoolean("Match/HasWarning", warning != WarningLevel.NONE);
+    matchWarning.setString(warning.getMessage());
 
-    // Warning type for color coding in Elastic
-    String warningType = switch (warning) {
-      case HUB_CLOSING_SOON -> "CLEAR";
-      case HUB_OPENING_SOON -> "READY";
-      case ENDGAME_APPROACHING, ENDGAME_URGENT, ENDGAME_CRITICAL -> "CLIMB";
-      default -> "NONE";
-    };
-    SmartDashboard.putString("Match/WarningType", warningType);
-
-    // FMS data status
-    SmartDashboard.putBoolean("Match/FmsDataReceived", matchStateTracker.isFmsDataReceived());
+    matchBattery.setDouble(round1(RobotController.getBatteryVoltage()));
+    matchVisionHealthy.setBoolean(driveSubsystem.isVisionHealthy());
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // DRIVE STATUS
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  private void updateDriveStatus() {
-    // Speed mode
-    double mult = driveSubsystem.getSpeedMultiplier();
-    String speedMode;
-    if (mult >= 0.9) speedMode = "FULL";
-    else if (mult >= 0.7) speedMode = "75%";
-    else if (mult >= 0.4) speedMode = "HALF";
-    else speedMode = "SLOW";
-
-    SmartDashboard.putString("Drive/SpeedMode", speedMode);
-    SmartDashboard.putNumber("Drive/SpeedMultiplier", mult);
-
-    // Field relative
-    SmartDashboard.putBoolean("Drive/FieldRelative", driveSubsystem.getFieldRelative());
-
-    // Heading (normalized 0-360)
-    double heading = driveSubsystem.getHeading() % 360;
-    if (heading < 0) heading += 360;
-    SmartDashboard.putNumber("Drive/Heading", Math.round(heading));
-
-    // Pose
-    Pose2d pose = driveSubsystem.getCurrentPose();
-    SmartDashboard.putNumber("Drive/PoseX", round2(pose.getX()));
-    SmartDashboard.putNumber("Drive/PoseY", round2(pose.getY()));
-    SmartDashboard.putNumber("Drive/PoseRotation", round1(pose.getRotation().getDegrees()));
-
-    // Tag count (aggregated from both cameras)
-    int frontTags = (int) SmartDashboard.getNumber(frontKey + "/TargetCount", 0);
-    int backTags = (int) SmartDashboard.getNumber(backKey + "/TargetCount", 0);
-    int totalTags = frontTags + backTags;
-    SmartDashboard.putNumber("Drive/TagCount", totalTags);
-    SmartDashboard.putBoolean("Drive/HasMultiTag", totalTags >= 2);
-
-    // Pose sanity checks
-    SmartDashboard.putBoolean("Drive/PoseInBounds", isInFieldBounds());
-    SmartDashboard.putBoolean("Drive/PoseSane", isPoseSane());
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SYSTEM STATUS
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  private void updateSystemStatus() {
-    SmartDashboard.putNumber("System/BatteryVoltage", round2(RobotController.getBatteryVoltage()));
-    SmartDashboard.putNumber("System/CPUTemp", round1(RobotController.getCPUTemp()));
-    SmartDashboard.putBoolean("System/Brownout", RobotController.isBrownedOut());
-
-    // Battery status for easy display
+  private void updatePitTab() {
     double voltage = RobotController.getBatteryVoltage();
-    String batteryStatus;
-    if (voltage >= 12.0) batteryStatus = "GOOD";
-    else if (voltage >= 11.0) batteryStatus = "OK";
-    else batteryStatus = "LOW";
-    SmartDashboard.putString("System/BatteryStatus", batteryStatus);
+    pitBattery.setDouble(round1(voltage));
+    pitBatteryStatus.setString(voltage >= 12.0 ? "GOOD" : voltage >= 11.0 ? "OK" : "LOW");
+    pitVisionHealthy.setBoolean(driveSubsystem.isVisionHealthy());
+    pitCameraCount.setInteger((int) SmartDashboard.getNumber("Vision/CameraCount", 0));
+    pitCanUtil.setDouble(round1(RobotController.getCANStatus().percentBusUtilization));
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PIT MODE COMMANDS
-  // ═══════════════════════════════════════════════════════════════════════════
+  private void updateVisionTab() {
+    visionHealthy.setBoolean(driveSubsystem.isVisionHealthy());
+    visionTotalTags.setInteger((int) SmartDashboard.getNumber("Vision/TotalTagCount", 0));
+    visionAccepted.setInteger((int) SmartDashboard.getNumber("Vision/PosesAccepted", 0));
+    visionRejected.setInteger((int) SmartDashboard.getNumber("Vision/PosesRejected", 0));
 
-  /**
-   * Checks for Pit Mode button presses and triggers commands.
-   * Buttons auto-reset after triggering.
-   */
+    visionFrontConnected.setBoolean(SmartDashboard.getBoolean(frontCameraKey + "/Connected", false));
+    visionFrontTargets.setInteger((int) SmartDashboard.getNumber(frontCameraKey + "/TargetCount", 0));
+    visionBackConnected.setBoolean(SmartDashboard.getBoolean(backCameraKey + "/Connected", false));
+    visionBackTargets.setInteger((int) SmartDashboard.getNumber(backCameraKey + "/TargetCount", 0));
+  }
+
+  private void updateSoftwareTab() {
+    softwareBattery.setDouble(round1(RobotController.getBatteryVoltage()));
+    softwareBrownout.setBoolean(RobotController.isBrownedOut());
+    softwareCanUtil.setDouble(round1(RobotController.getCANStatus().percentBusUtilization));
+  }
+
   private void checkPitCommands() {
-    // Set Wheels Straight
-    if (SmartDashboard.getBoolean("Pit/SetWheelsStraight", false)) {
-      SmartDashboard.putBoolean("Pit/SetWheelsStraight", false);
+    if (pitSetWheelsStraight.getBoolean(false)) {
+      pitSetWheelsStraight.setBoolean(false);
       UtilityCommands.setStraightAhead(driveSubsystem).schedule();
-      System.out.println("PIT: Setting wheels straight");
     }
-
-    // Zero Heading
-    if (SmartDashboard.getBoolean("Pit/ZeroHeading", false)) {
-      SmartDashboard.putBoolean("Pit/ZeroHeading", false);
+    if (pitZeroHeading.getBoolean(false)) {
+      pitZeroHeading.setBoolean(false);
       UtilityCommands.zeroHeading(driveSubsystem).schedule();
-      System.out.println("PIT: Zeroing heading");
     }
-
-    // Coast Mode
-    if (SmartDashboard.getBoolean("Pit/CoastMode", false)) {
-      SmartDashboard.putBoolean("Pit/CoastMode", false);
+    if (pitCoastMode.getBoolean(false)) {
+      pitCoastMode.setBoolean(false);
       UtilityCommands.setCoastMode(driveSubsystem).schedule();
-      System.out.println("PIT: Motors set to COAST mode");
     }
-
-    // Brake Mode
-    if (SmartDashboard.getBoolean("Pit/BrakeMode", false)) {
-      SmartDashboard.putBoolean("Pit/BrakeMode", false);
+    if (pitBrakeMode.getBoolean(false)) {
+      pitBrakeMode.setBoolean(false);
       UtilityCommands.setBrakeMode(driveSubsystem).schedule();
-      System.out.println("PIT: Motors set to BRAKE mode");
     }
-
-    // Force Vision Reset
-    if (SmartDashboard.getBoolean("Pit/ForceVisionReset", false)) {
-      SmartDashboard.putBoolean("Pit/ForceVisionReset", false);
+    if (pitVisionReset.getBoolean(false)) {
+      pitVisionReset.setBoolean(false);
       UtilityCommands.forceVisionReset(driveSubsystem).schedule();
-      System.out.println("PIT: Forcing vision reset");
     }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // HELPER METHODS
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Checks if the current pose is within reasonable field bounds.
-   * FRC field is approximately 16.5m x 8.0m.
-   */
-  private boolean isInFieldBounds() {
-    Pose2d pose = driveSubsystem.getCurrentPose();
-    double x = pose.getX();
-    double y = pose.getY();
-    return x >= -1.0 && x <= 17.5 && y >= -1.0 && y <= 9.0;
-  }
-
-  /**
-   * Overall sanity check for pose.
-   */
-  private boolean isPoseSane() {
-    return isInFieldBounds() && Math.abs(driveSubsystem.getGyroRate()) < 720;
-  }
-
-  private double round2(double value) {
-    return Math.round(value * 100.0) / 100.0;
   }
 
   private double round1(double value) {

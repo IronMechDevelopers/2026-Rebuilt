@@ -104,7 +104,7 @@ public class DriveCommands {
   }
 
   // =========================================================================
-  // PATHFINDING - Navigate to locations
+  // PATHFINDING - Navigate to t
   // =========================================================================
 
   /** Pathfinds to a specific pose using PathPlanner. */

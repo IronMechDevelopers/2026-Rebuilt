@@ -4,11 +4,9 @@
 
 package frc.robot;
 
-import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
-import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 
 import edu.wpi.first.wpilibj2.command.Command;
@@ -52,20 +50,11 @@ public class Robot extends LoggedRobot {
 
     } else {
       // ═════════════════════════════════════════════════════════════════════
-      // SIMULATION/REPLAY MODE
+      // SIMULATION MODE - Just stream to NetworkTables (no blocking prompt)
       // ═════════════════════════════════════════════════════════════════════
-      setUseTiming(false); // Run as fast as possible in simulation
-
-      // Check if replaying a log file
-      String logPath = LogFileUtil.findReplayLog();
-      if (logPath != null) {
-        // Replay mode - read from existing log
-        Logger.setReplaySource(new WPILOGReader(logPath));
-        Logger.addDataReceiver(new WPILOGWriter(LogFileUtil.addPathSuffix(logPath, "_sim")));
-      } else {
-        // Simulation mode - log new data
-        Logger.addDataReceiver(new NT4Publisher());
-      }
+      // Note: For replay, use AdvantageScope to open a log file directly
+      // or set AKIT_LOG_PATH environment variable before launching
+      Logger.addDataReceiver(new NT4Publisher());
     }
 
     // Start logging! Must be called after adding receivers

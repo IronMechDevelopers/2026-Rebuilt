@@ -74,7 +74,6 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
     // ═══════════════════════════════════════════════════════════════════════
     private int consecutiveFailures = 0;
     private int totalFailures = 0;
-    private double lastSuccessTime = 0;
     private double lastErrorLogTime = 0;
     private int periodicLoopCounter = 0;
 
@@ -84,6 +83,10 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
 
     // Currently visible AprilTag field positions (for AdvantageScope visualization)
     private Pose2d[] visibleTagPoses = new Pose2d[0];
+
+    // Session counters for dashboard (cumulative since boot)
+    private int posesAcceptedTotal = 0;
+    private int posesRejectedTotal = 0;
 
     /**
      * Creates a VisionSubsystem with the specified cameras.
@@ -96,7 +99,6 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
      */
     public VisionSubsystem(AprilTagFieldLayout fieldLayout, CameraConfig... configs) {
         this.fieldLayout = fieldLayout;
-        this.lastSuccessTime = Timer.getFPGATimestamp(); // Prevent immediate "stale" warning
 
         // Set up dashboard controls
         SmartDashboard.setDefaultBoolean("Vision/Enabled", true);
@@ -308,11 +310,13 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
                     if (rejected) {
                         cameraRejectedPoses.add(robotPose3d);
                         allRejectedPoses.add(robotPose3d);
+                        posesRejectedTotal++;
                     } else {
                         cameraAcceptedPoses.add(robotPose3d);
                         allAcceptedPoses.add(robotPose3d);
                         validEstimates.add(estimate);
                         debugPose = robotPose3d.toPose2d();
+                        posesAcceptedTotal++;
                     }
                 }
 
@@ -330,6 +334,11 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
         Logger.recordOutput("Vision/Summary/RobotPoses", allRobotPoses.toArray(new Pose3d[0]));
         Logger.recordOutput("Vision/Summary/RobotPosesAccepted", allAcceptedPoses.toArray(new Pose3d[0]));
         Logger.recordOutput("Vision/Summary/RobotPosesRejected", allRejectedPoses.toArray(new Pose3d[0]));
+
+        // Dashboard keys (per best practices doc)
+        Logger.recordOutput("Vision/TotalTagCount", allTagPoses.size());
+        Logger.recordOutput("Vision/PosesAccepted", posesAcceptedTotal);
+        Logger.recordOutput("Vision/PosesRejected", posesRejectedTotal);
 
         // Update visible tag poses for external access (2D for compatibility)
         List<Pose2d> tagPoses2d = new ArrayList<>();
@@ -389,7 +398,7 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
     public Matrix<N3, N1> getEstimationStdDevs(EstimatedRobotPose estimatedPose) {
         var targets = estimatedPose.targetsUsed;
         int numTags = targets.size();
-
+        
         // Calculate average distance to targets
         double avgDist = 0;
         for (PhotonTrackedTarget tgt : targets) {
@@ -401,24 +410,37 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
         }
         if (numTags > 0) avgDist /= numTags;
 
-        // Logic: Multi-tag is very trustworthy. Single tag trust scales with distance.
+        // BASELINE: Multi-tag is very trustworthy.
         if (numTags >= 2) {
+            // Even with multi-tag, confidence degrades with distance, but much more slowly.
+            // At 12ft (3.6m), multi-tag is still solid.
+            double confidenceScale = 1.0 + (avgDist / 4.0); // Mild scaling
+            
             return VecBuilder.fill(
-                VisionConstants.kMultiTagHighTrustStdDevXY,
-                VisionConstants.kMultiTagHighTrustStdDevXY,
+                VisionConstants.kMultiTagHighTrustStdDevXY * confidenceScale,
+                VisionConstants.kMultiTagHighTrustStdDevXY * confidenceScale,
                 Math.toRadians(VisionConstants.kMultiTagHighTrustStdDevThetaDegrees)
             );
-        } else {
-            if (avgDist > VisionConstants.kMaxVisionDistanceMeters) {
-                return VecBuilder.fill(100, 100, 100); // effectively ignore (very high variance)
-            } else {
-                double scale = 1 + (avgDist * avgDist / VisionConstants.kVisionTrustScaleDenominator);
-                return VecBuilder.fill(
-                    VisionConstants.kSingleTagBaseTrustStdDevXY * scale,
-                    VisionConstants.kSingleTagBaseTrustStdDevXY * scale,
-                    Math.toRadians(VisionConstants.kSingleTagBaseTrustStdDevThetaDegrees) * scale
-                );
-            }
+        } 
+        
+        // SINGLE TAG: The "Danger Zone"
+        else {
+            // 1. If too far, effectively ignore
+            if (avgDist > VisionConstants.kMaxVisionDistanceMeters) { // Set this to 4.0 meters (approx 13ft)
+                return VecBuilder.fill(1000, 1000, 1000); 
+            } 
+            
+            // 2. Exponential Falloff
+            // At 1 meter, scale is ~1. At 4 meters, scale is HUGE.
+            // This allows accurate close range, but loose long range updates.
+            double distSq = avgDist * avgDist;
+            double confidenceScale = 1 + (distSq / VisionConstants.kVisionTrustScaleDenominator); // Set denom to ~2.0
+
+            return VecBuilder.fill(
+                VisionConstants.kSingleTagBaseTrustStdDevXY * confidenceScale,
+                VisionConstants.kSingleTagBaseTrustStdDevXY * confidenceScale,
+                Math.toRadians(VisionConstants.kSingleTagBaseTrustStdDevThetaDegrees) * confidenceScale
+            );
         }
     }
 
@@ -431,7 +453,6 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
      */
     private void recordSuccess() {
         consecutiveFailures = 0;
-        lastSuccessTime = Timer.getFPGATimestamp();
     }
 
     /**
@@ -452,19 +473,19 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
     /**
      * Updates the health status based on current state.
      * Called each periodic cycle.
+     *
+     * <p>Note: We intentionally do NOT check for "stale" data (no tags seen recently).
+     * With only 2 cameras, it's normal to not see any AprilTags for extended periods
+     * while driving around the field. Not seeing tags ≠ vision being broken.
      */
     private void updateHealthStatus() {
-        double now = Timer.getFPGATimestamp();
-        double timeSinceSuccess = now - lastSuccessTime;
-
         // Check various failure conditions
         boolean enabled = SmartDashboard.getBoolean("Vision/Enabled", true);
         boolean hasFieldLayout = fieldLayout != null;
         boolean hasCameras = !cameras.isEmpty();
         boolean tooManyFailures = consecutiveFailures >= VisionConstants.kMaxConsecutiveFailures;
-        boolean isStale = timeSinceSuccess > VisionConstants.kVisionStaleTimeoutSeconds;
 
-        // Determine health
+        // Determine health based on actual problems, not tag visibility
         if (!enabled) {
             visionHealthy = false;
             healthStatus = "DISABLED by user";
@@ -477,9 +498,6 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
         } else if (tooManyFailures) {
             visionHealthy = false;
             healthStatus = "UNHEALTHY - " + consecutiveFailures + " consecutive failures";
-        } else if (isStale) {
-            visionHealthy = false;
-            healthStatus = String.format("STALE - no data for %.1fs", timeSinceSuccess);
         } else {
             visionHealthy = true;
             healthStatus = "HEALTHY";
@@ -490,10 +508,12 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
         SmartDashboard.putString("Vision/HealthStatus", healthStatus);
         SmartDashboard.putNumber("Vision/ConsecutiveFailures", consecutiveFailures);
         SmartDashboard.putNumber("Vision/TotalFailures", totalFailures);
+        SmartDashboard.putNumber("Vision/CameraCount", cameras.size());
 
         // AdvantageKit logging
         Logger.recordOutput("Vision/Healthy", visionHealthy);
         Logger.recordOutput("Vision/ConsecutiveFailures", consecutiveFailures);
+        Logger.recordOutput("Vision/CameraCount", cameras.size());
     }
 
     /**
@@ -570,10 +590,10 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
 
                 // Detailed logging (rate-limited)
                 if (logDetailedData) {
-                    // Latency check
+                    // Latency check (key name per dashboard spec)
                     double latencyMs = latestResult.metadata.getLatencyMillis();
                     boolean latencyOK = latencyMs <= VisionConstants.kMaxLatencyMs;
-                    SmartDashboard.putNumber(base + "/LatencyMs", latencyMs);
+                    SmartDashboard.putNumber(base + "/Latency", latencyMs);
                     SmartDashboard.putBoolean(base + "/LatencyOK", latencyOK);
 
                     // Build tag ID list and per-tag distance info
@@ -610,7 +630,8 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
 
                     SmartDashboard.putString(base + "/TagIDs", tagIds.length() > 0 ? tagIds.toString() : "None");
                     SmartDashboard.putString(base + "/TagDistances", tagDistances.length() > 0 ? tagDistances.toString() : "None");
-                    SmartDashboard.putNumber(base + "/BestAmbiguity", cameraLowestAmbiguity < Double.MAX_VALUE ? cameraLowestAmbiguity : 0);
+                    // Ambiguity key per dashboard spec
+                    SmartDashboard.putNumber(base + "/Ambiguity", cameraLowestAmbiguity < Double.MAX_VALUE ? cameraLowestAmbiguity : 0);
                     SmartDashboard.putBoolean(base + "/AmbiguityOK", cameraLowestAmbiguity <= VisionConstants.kMaxAmbiguity);
                     SmartDashboard.putNumber(base + "/ClosestDistance", cameraClosestDist < Double.MAX_VALUE ? cameraClosestDist : 0);
                 }

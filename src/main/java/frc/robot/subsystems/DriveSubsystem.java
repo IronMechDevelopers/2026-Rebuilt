@@ -19,6 +19,8 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.numbers.N1;
+import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.RobotController;
@@ -29,6 +31,7 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.constants.DriveConstants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.constants.HardwareConstants;
+import edu.wpi.first.math.Matrix;
 
 /**
  * Controls the swerve drivetrain and handles pose estimation (Odometry + Vision).
@@ -251,48 +254,57 @@ public class DriveSubsystem extends SubsystemBase {
      */
     private void processVisionMeasurements() {
         // Rejection 1: Spinning too fast causes camera motion blur
+        // (Even with global shutter, processing latency while spinning can cause lag)
         if (Math.abs(gyro.getRate()) > DriveConstants.kMaxAngularVelocityForVisionDegPerSec) {
             return;
         }
 
         Pose2d currentEstimate = poseEstimator.getEstimatedPosition();
         List<EstimatedRobotPose> visionEstimates = vision.getEstimatedGlobalPoses(currentEstimate);
+        double currentTime = Timer.getFPGATimestamp();
 
         if (!visionEstimates.isEmpty()) {
-            lastVisionUpdateTime = edu.wpi.first.wpilibj.Timer.getFPGATimestamp();
-            // Store latest vision pose for logging/comparison
+            lastVisionUpdateTime = currentTime;
             latestVisionPose = visionEstimates.get(0).estimatedPose.toPose2d();
         }
 
         boolean classroomMode = SmartDashboard.getBoolean("Vision/ClassroomMode", false);
-        double largeThreshold = classroomMode 
-            ? DriveConstants.kVisionLargeCorrectionThreshold_Classroom 
-            : DriveConstants.kVisionLargeCorrectionThreshold_Competition;
-        double smallThreshold = classroomMode 
-            ? DriveConstants.kVisionSmallCorrectionThreshold_Classroom 
+        double smallThreshold = classroomMode
+            ? DriveConstants.kVisionSmallCorrectionThreshold_Classroom
             : DriveConstants.kVisionSmallCorrectionThreshold_Competition;
 
         for (EstimatedRobotPose est : visionEstimates) {
+            // Rejection 2: Stale measurement - image is too old to be useful
+            double measurementAge = currentTime - est.timestampSeconds;
+            if (measurementAge > DriveConstants.kMaxVisionMeasurementAgeSeconds) {
+                continue; // Skip this stale frame
+            }
+
             Pose2d estPose = est.estimatedPose.toPose2d();
+
+            // Calculate distance between current odometry and vision estimate
             double distanceDiff = currentEstimate.getTranslation().getDistance(estPose.getTranslation());
             boolean multiTag = est.targetsUsed.size() >= 2;
 
+            // Get the calculated trust from VisionSubsystem (Don't overwrite this!)
+            Matrix<N3, N1> stdDevs = vision.getEstimationStdDevs(est);
+
             if (multiTag) {
-                // Multi-tag is high confidence. If error is large, snap quickly (high trust/low stdDev).
-                var stdDevs = vision.getEstimationStdDevs(est);
-                if (distanceDiff > largeThreshold) {
-                    stdDevs = VecBuilder.fill(
-                        DriveConstants.kVisionHighTrustStdDevXY, 
-                        DriveConstants.kVisionHighTrustStdDevXY, 
-                        DriveConstants.kVisionHighTrustStdDevTheta);
-                }
+                // Multi-tag: extremely reliable, even at range.
+                // However, if the pose jumps wildly (e.g. 2 meters), we still treat it with caution
+                // unless we are in the "Large Threshold" logic (like a reset).
                 poseEstimator.addVisionMeasurement(estPose, est.timestampSeconds, stdDevs);
-                
-            } else if (distanceDiff < smallThreshold) {
-                // Single tag is ok if it aligns with current odometry.
-                poseEstimator.addVisionMeasurement(estPose, est.timestampSeconds, vision.getEstimationStdDevs(est));
+
+            } else {
+                // Single Tag Logic:
+                // Only accept single tag updates if they are relatively close to where we think we are.
+                // This prevents "teleporting" to the other side of the field due to a false ID detection.
+                if (distanceDiff < smallThreshold) {
+                    poseEstimator.addVisionMeasurement(estPose, est.timestampSeconds, stdDevs);
+                }
+                // If distanceDiff is large > smallThreshold, we ignore single-tag data.
+                // It's too risky to let a single tag reset our field position by a large amount.
             }
-            // else: Single tag with large error is likely a false positive/reflection. Ignore.
         }
     }
 

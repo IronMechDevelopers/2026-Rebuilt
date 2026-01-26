@@ -75,6 +75,9 @@ public final class DriveConstants {
   /** Vision timeout (seconds). Warn if no AprilTags detected for this long. */
   public static final double kVisionTimeoutSeconds = 2.0;
 
+  /** Max age for vision measurements (seconds). Reject frames older than this. */
+  public static final double kMaxVisionMeasurementAgeSeconds = 0.5;
+
   // ═══════════════════════════════════════════════════════════════════════
   // VISION CORRECTION THRESHOLDS - Competition Mode vs Classroom Mode
   // ═══════════════════════════════════════════════════════════════════════
