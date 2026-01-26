@@ -1,384 +1,469 @@
-# Dashboard Best Practices
+# Dashboard Guide
 
-A guide to organizing dashboards using Elastic and AdvantageScope.
+Four Elastic dashboard layouts for different roles and situations.
 
 ---
 
 ## Table of Contents
 
-1. [Dashboard Philosophy](#dashboard-philosophy)
-2. [NetworkTables Key Reference](#networktables-key-reference)
-3. [Elastic Setup Guide](#elastic-setup-guide)
-4. [AdvantageScope Usage](#advantagescope-usage)
-5. [2026 REBUILT Match Dashboard](#2026-rebuilt-match-dashboard)
+1. [Dashboard Overview](#dashboard-overview)
+2. [Match Dashboard](#1-match-dashboard)
+3. [Pit Mode Dashboard](#2-pit-mode-dashboard)
+4. [Vision Dashboard](#3-vision-dashboard)
+5. [Software Dashboard](#4-software-dashboard)
+6. [Practice Mode](#practice-mode)
+7. [AdvantageScope Usage](#advantagescope-usage)
 
 ---
 
-## Dashboard Philosophy
+## Dashboard Overview
 
 ```
-THE TWO TOOLS - EACH HAS A PURPOSE
+FOUR DASHBOARDS - FOUR PURPOSES
 ═══════════════════════════════════════════════════════════════════════════════
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              ELASTIC                                         │
-│                        (Live Match Display)                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  PURPOSE:  Show critical info DURING matches                                │
-│  WHEN:     Competition, testing, pit checks                                 │
-│  STYLE:    Large widgets, green/red indicators, minimal clutter            │
-│                                                                             │
-│  GOOD FOR:                                                                  │
-│  ├── Auto selector                                                          │
-│  ├── Hub status (ACTIVE/INACTIVE) for 2026 REBUILT                         │
-│  ├── Warning banners (CLEAR ZONE, GET READY, CLIMB NOW)                    │
-│  ├── Battery voltage                                                        │
-│  ├── Vision status (working/broken)                                         │
-│  └── Field visualization                                                    │
-│                                                                             │
-│  BAD FOR:                                                                   │
-│  ├── Historical data (can't scroll back)                                    │
-│  └── Detailed graphs (use AdvantageScope)                                   │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          ADVANTAGESCOPE                                     │
-│                     (Post-Match Analysis)                                   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  PURPOSE:  Analyze what happened AFTER matches                              │
-│  WHEN:     Between matches, at home, debugging                              │
-│  STYLE:    Graphs, 3D visualization, log replay                             │
-│                                                                             │
-│  GOOD FOR:                                                                  │
-│  ├── Comparing odometry vs vision poses                                     │
-│  ├── Finding when/why something failed                                      │
-│  ├── Tuning PID by looking at response curves                               │
-│  ├── 3D robot visualization with AprilTags                                  │
-│  ├── Sharing logs with mentors/other teams                                  │
-│  └── Replaying exact driver inputs                                          │
-│                                                                             │
-│  BAD FOR:                                                                   │
-│  ├── Real-time driver feedback (use Elastic)                                │
-│  └── Quick pit checks (takes time to load)                                  │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│     MATCH       │  │    PIT MODE     │  │     VISION      │  │    SOFTWARE     │
+├─────────────────┤  ├─────────────────┤  ├─────────────────┤  ├─────────────────┤
+│                 │  │                 │  │                 │  │                 │
+│  Drive Team     │  │  Pit Crew       │  │  Vision Team    │  │  Programmers    │
+│  During Match   │  │  Between Matches│  │  Camera Tuning  │  │  Debugging      │
+│                 │  │                 │  │                 │  │                 │
+│  Hub Status     │  │  System Checks  │  │  Tag Detection  │  │  PID Tuning     │
+│  Shift Timing   │  │  Setup Commands │  │  Pose Estimates │  │  Module States  │
+│  Warnings       │  │  Battery Check  │  │  Ambiguity      │  │  CAN Bus        │
+│                 │  │                 │  │                 │  │                 │
+└─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
-### Data Flow Architecture
+### Switching Dashboards in Elastic
 
-```
-DATA FLOW IN YOUR ROBOT CODE
-═══════════════════════════════════════════════════════════════════════════════
+Save each layout as a separate file:
+- `match.json`
+- `pit.json`
+- `vision.json`
+- `software.json`
 
-                         ┌─────────────────┐
-                         │   SUBSYSTEMS    │
-                         │ (VisionSubsystem│
-                         │  DriveSubsystem │
-                         │MatchStateTracker│
-                         └────────┬────────┘
-                                  │
-              ┌───────────────────┼───────────────────┐
-              │                   │                   │
-              ▼                   ▼                   ▼
-    ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-    │ SmartDashboard  │ │ Logger.record   │ │ DashboardSetup  │
-    │ .putX()         │ │ Output()        │ │ .periodic()     │
-    │                 │ │                 │ │                 │
-    │ NetworkTables   │ │ AdvantageKit    │ │ Aggregates data │
-    └────────┬────────┘ └────────┬────────┘ └────────┬────────┘
-             │                   │                   │
-             │                   │                   │
-             ▼                   ▼                   ▼
-    ┌─────────────────────────────────────────────────────────┐
-    │                     NETWORKTABLES                        │
-    │  (Match/*, Drive/*, Vision/*, Hub/*, System/*)          │
-    └────────────────────────┬────────────────────────────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              ▼                             ▼
-    ┌─────────────────┐           ┌─────────────────┐
-    │     ELASTIC     │           │  ADVANTAGESCOPE │
-    │  (Live display) │           │  (Log replay)   │
-    └─────────────────┘           └─────────────────┘
-```
+Use **File → Open** to switch between them quickly.
 
 ---
 
-## NetworkTables Key Reference
+## 1. Match Dashboard
 
-All data is published to NetworkTables via SmartDashboard. Here are the keys organized by namespace:
+**WHO:** Drive team during competition
+**WHEN:** Matches and practice matches
+**GOAL:** Show only what drivers need to make decisions
 
-### Match/* (2026 REBUILT Hub Status)
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `Match/HubActive` | Boolean | TRUE if our hub is currently active (can score) |
-| `Match/HubStatus` | String | "ACTIVE", "INACTIVE", or "UNKNOWN" |
-| `Match/NextStatus` | String | "→ ACTIVE", "→ INACTIVE", or "→ ???" |
-| `Match/ShiftCountdown` | Number | Seconds until next shift change |
-| `Match/TimeInPhase` | Number | Seconds elapsed in current phase |
-| `Match/Phase` | String | "Auto", "Transition", "Shift 1-4", "Endgame" |
-| `Match/Warning` | String | Warning message or empty string |
-| `Match/HasWarning` | Boolean | TRUE if a warning is active |
-| `Match/WarningType` | String | "CLEAR", "READY", "CLIMB", or "NONE" |
-| `Match/FmsDataReceived` | Boolean | TRUE once FMS game data arrives |
-| `Match/WeAreFirst` | String | "WE'RE INACTIVE FIRST" or "THEY'RE INACTIVE FIRST" |
-| `Match/PracticeMode` | Boolean | TRUE when practice mode is active |
-
-### Practice/* (Shift Timing Training)
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `Practice/Enabled` | Boolean | Toggle to start/stop practice mode (writable) |
-| `Practice/WeAreInactiveFirst` | Boolean | Configure which scenario to practice (writable) |
-| `Practice/Restart` | Boolean | Tap TRUE to restart from Shift 1 (writable) |
-| `Practice/CycleNumber` | Number | How many times through all 4 shifts |
-| `Practice/TotalElapsed` | Number | Total seconds since practice started |
-
-### LED/*
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `LED/State` | String | Current LED state description |
-| `LED/Pattern` | String | Current pattern type (SOLID, BLINK, etc.) |
-| `LED/Color` | String | Primary color name |
-| `LED/HasInterrupt` | Boolean | TRUE if temporary interrupt is active |
-| `LED/Connected` | Boolean | Hardware connection status |
-
-### Drive/*
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `Drive/SpeedMode` | String | "FULL", "75%", "HALF", or "SLOW" |
-| `Drive/SpeedMultiplier` | Number | 0.0 to 1.0 |
-| `Drive/FieldRelative` | Boolean | TRUE if field-relative driving |
-| `Drive/Heading` | Number | 0-360 degrees |
-| `Drive/PoseX` | Number | X position in meters |
-| `Drive/PoseY` | Number | Y position in meters |
-| `Drive/PoseRotation` | Number | Rotation in degrees |
-| `Drive/TagCount` | Number | Total AprilTags visible |
-| `Drive/HasMultiTag` | Boolean | TRUE if 2+ tags visible |
-| `Drive/PoseInBounds` | Boolean | TRUE if pose is within field |
-| `Drive/PoseSane` | Boolean | TRUE if pose passes sanity checks |
-
-### Hub/*
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `Hub/DistanceInches` | Number | Distance to alliance hub in inches |
-| `Hub/InRange` | Boolean | TRUE if in optimal shooting range |
-
-### Vision/*
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `Vision/Healthy` | Boolean | TRUE if vision system is working |
-| `Vision/HealthStatus` | String | Detailed status message |
-| `Vision/Enabled` | Boolean | Kill switch (write to disable) |
-| `Vision/AnyTargetsVisible` | Boolean | TRUE if any camera sees tags |
-| `Vision/{Camera}/Connected` | Boolean | Per-camera connection status |
-| `Vision/{Camera}/HasTargets` | Boolean | Per-camera target detection |
-| `Vision/{Camera}/TargetCount` | Number | Tags seen by this camera |
-
-### System/*
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `System/BatteryVoltage` | Number | Battery voltage |
-| `System/BatteryStatus` | String | "GOOD", "OK", or "LOW" |
-| `System/CPUTemp` | Number | RoboRIO CPU temperature |
-| `System/Brownout` | Boolean | TRUE if brownout detected |
-
----
-
-## Elastic Setup Guide
-
-### Installing Elastic
-
-1. Download Elastic from: https://github.com/Gold872/elastic-dashboard
-2. Install and run Elastic
-3. Connect to your robot (or simulation) via NetworkTables
-
-### Creating Your Match Layout
-
-In Elastic, create widgets that read the NetworkTables keys above:
-
-**Recommended Match Layout:**
+### Layout
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
-│  MATCH DASHBOARD - 2026 REBUILT                               Team 5684  │
+│  MATCH DASHBOARD                                               Team 5684  │
 ├───────────────────────────────────────────────────────────────────────────┤
 │                                                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐ │
+│  │                                                                      │ │
+│  │   ⚠️  WARNING MESSAGE HERE                    Match/Warning          │ │
+│  │                                                                      │ │
+│  └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                           │
 │  ┌─────────────────────┐  ┌──────────────┐  ┌──────────────────────────┐ │
-│  │                     │  │   SHIFT IN   │  │       PHASE              │ │
-│  │     OUR HUB         │  │              │  │      Shift 2             │ │
-│  │    [ACTIVE]         │  │     18       │  ├──────────────────────────┤ │
-│  │                     │  │              │  │     FMS DATA             │ │
-│  │  Match/HubActive    │  │ Match/Shift  │  │      [GREEN]             │ │
-│  │                     │  │  Countdown   │  │                          │ │
+│  │                     │  │              │  │                          │ │
+│  │     OUR HUB IS      │  │  SHIFT IN    │  │        PHASE             │ │
+│  │                     │  │              │  │                          │ │
+│  │     [ACTIVE]        │  │     18       │  │       Shift 2            │ │
+│  │        or           │  │   seconds    │  │                          │ │
+│  │    [INACTIVE]       │  │              │  │  Next: WE'RE INACTIVE    │ │
+│  │                     │  │              │  │                          │ │
+│  │  Match/HubActive    │  │Match/Shift   │  │  Match/Phase             │ │
+│  │                     │  │  Countdown   │  │  Match/NextStatus        │ │
 │  └─────────────────────┘  └──────────────┘  └──────────────────────────┘ │
 │                                                                           │
-│  ┌──────────────────────────────────────────────────────────────────────┐│
-│  │                                                                       ││
-│  │   ⚠️  CLEAR ZONE!                              Match/Warning          ││
-│  │                                                                       ││
-│  └──────────────────────────────────────────────────────────────────────┘│
-│                                                                           │
-│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌─────────┐│
-│  │   AUTO     │ │  VISION    │ │  HUB DIST  │ │  IN RANGE  │ │  BATT   ││
-│  │ [Chooser]  │ │  [GREEN]   │ │    72"     │ │  [GREEN]   │ │  12.4V  ││
-│  │            │ │            │ │            │ │            │ │         ││
-│  │Auto Selector│Vision/Healthy│Hub/Distance │ Hub/InRange │ System/  ││
-│  │            │ │            │ │  Inches    │ │            │ Battery  ││
-│  └────────────┘ └────────────┘ └────────────┘ └────────────┘ └─────────┘│
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐            │
+│  │   AUTO     │ │  BATTERY   │ │  IN RANGE  │ │   VISION   │            │
+│  │ [Chooser]  │ │   12.4V    │ │  [GREEN]   │ │  [GREEN]   │            │
+│  │            │ │            │ │            │ │            │            │
+│  │   Auto     │ │  System/   │ │Hub/InRange │ │  Vision/   │            │
+│  │  Selector  │ │  Battery   │ │            │ │  Healthy   │            │
+│  └────────────┘ └────────────┘ └────────────┘ └────────────┘            │
 │                                                                           │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Widget Configuration Tips
+### NetworkTables Keys
 
-1. **Boolean indicators**: Use color coding
-   - `Match/HubActive`: Green when TRUE, Red when FALSE
-   - `Vision/Healthy`: Green when TRUE, Red when FALSE
-   - `Match/HasWarning`: Orange when TRUE, Dark when FALSE
+| Key | Type | Widget | Description |
+|-----|------|--------|-------------|
+| `Match/HubActive` | Boolean | Large indicator | GREEN=score, RED=wait |
+| `Match/HubStatus` | String | Text | "ACTIVE" / "INACTIVE" |
+| `Match/ShiftCountdown` | Number | Large number | Seconds until shift change |
+| `Match/Phase` | String | Text | Current match phase |
+| `Match/Warning` | String | Large banner | Warning message (hide when empty) |
+| `Match/HasWarning` | Boolean | - | Use to show/hide warning banner |
+| `Match/NextStatus` | String | Text | What happens next |
+| `Hub/InRange` | Boolean | Indicator | GREEN=can score |
+| `Vision/Healthy` | Boolean | Indicator | GREEN=vision working |
+| `System/BatteryVoltage` | Number | Gauge | Battery level |
+| `SmartDashboard/Auto Selector` | SendableChooser | Dropdown | Auto routine picker |
 
-2. **Warning banner**: Make it LARGE and center it
-   - Read from `Match/Warning`
-   - Use `Match/WarningType` to set colors:
-     - "CLEAR" = Orange
-     - "READY" = Yellow
-     - "CLIMB" = Red
-     - "NONE" = Hidden/Dark
+### Warning Colors
 
-3. **Countdown**: Use a large number display
-   - Read from `Match/ShiftCountdown`
-   - Consider a radial gauge (0-30 range)
+| `Match/Warning` Value | Color | Meaning |
+|----------------------|-------|---------|
+| `"CLEAR ZONE!"` | Orange | Hub closing in 9s |
+| `"GET READY!"` | Yellow | Hub opening in 9s |
+| `"ENDGAME SOON"` | Purple | 30s remaining |
+| `"CLIMB NOW!"` | Red | 15s remaining |
+| `"GO GO GO!"` | Flashing Red | 5s remaining |
+
+---
+
+## 2. Pit Mode Dashboard
+
+**WHO:** Pit crew
+**WHEN:** Between matches, before queuing
+**GOAL:** Verify robot is ready, run setup commands
+
+### Layout
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│  PIT MODE                                                      Team 5684  │
+├───────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  SYSTEM STATUS                                                            │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐             │
+│  │  BATTERY   │ │   VISION   │ │  CAN BUS   │ │   GYRO     │             │
+│  │   12.6V    │ │  [GREEN]   │ │    24%     │ │  [GREEN]   │             │
+│  │  [GREEN]   │ │            │ │  [GREEN]   │ │            │             │
+│  └────────────┘ └────────────┘ └────────────┘ └────────────┘             │
+│                                                                           │
+│  SETUP COMMANDS                                                           │
+│  ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐       │
+│  │                   │ │                   │ │                   │       │
+│  │  SET WHEELS       │ │   ZERO HEADING    │ │   COAST MODE      │       │
+│  │  STRAIGHT         │ │                   │ │                   │       │
+│  │                   │ │                   │ │                   │       │
+│  │  [BUTTON]         │ │     [BUTTON]      │ │    [BUTTON]       │       │
+│  │                   │ │                   │ │                   │       │
+│  │Pit/SetWheels      │ │  Pit/ZeroHeading  │ │  Pit/CoastMode    │       │
+│  │  Straight         │ │                   │ │                   │       │
+│  └───────────────────┘ └───────────────────┘ └───────────────────┘       │
+│                                                                           │
+│  ┌───────────────────┐ ┌───────────────────┐                             │
+│  │                   │ │                   │                             │
+│  │   BRAKE MODE      │ │  VISION RESET     │                             │
+│  │                   │ │                   │                             │
+│  │    [BUTTON]       │ │     [BUTTON]      │                             │
+│  │                   │ │                   │                             │
+│  │  Pit/BrakeMode    │ │Pit/ForceVisionReset                            │
+│  └───────────────────┘ └───────────────────┘                             │
+│                                                                           │
+│  ALLIANCE SELECTION                                                       │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  [ ] Red Alliance    [ ] Blue Alliance         Pit/Alliance        │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### NetworkTables Keys - Status
+
+| Key | Type | Widget | Good Value |
+|-----|------|--------|------------|
+| `System/BatteryVoltage` | Number | Gauge | > 12.0V |
+| `System/BatteryStatus` | String | Text | "GOOD" |
+| `Vision/Healthy` | Boolean | Indicator | TRUE |
+| `Vision/CameraCount` | Number | Text | Expected count |
+| `CAN/PercentUtilization` | Number | Gauge | < 70% |
+| `Drive/GyroConnected` | Boolean | Indicator | TRUE |
+
+### NetworkTables Keys - Commands (Writable)
+
+These keys trigger commands when set to TRUE. The robot code reads them and runs the command.
+
+| Key | Type | Action |
+|-----|------|--------|
+| `Pit/SetWheelsStraight` | Boolean | Points all wheels forward |
+| `Pit/ZeroHeading` | Boolean | Resets gyro heading to 0 |
+| `Pit/CoastMode` | Boolean | Sets motors to coast (push robot) |
+| `Pit/BrakeMode` | Boolean | Sets motors to brake (competition) |
+| `Pit/ForceVisionReset` | Boolean | Resets pose to vision estimate |
+
+### Pre-Match Checklist
+
+Use these indicators to verify before queuing:
+
+1. **Battery** - `System/BatteryVoltage` > 12.5V
+2. **Vision** - `Vision/Healthy` = TRUE
+3. **CAN Bus** - `CAN/PercentUtilization` < 50%
+4. **Gyro** - `Drive/GyroConnected` = TRUE
+5. **Wheels** - Run "Set Wheels Straight" and visually verify
+6. **Motors** - Set to Brake Mode before match
+
+---
+
+## 3. Vision Dashboard
+
+**WHO:** Vision team / programmers
+**WHEN:** Tuning cameras, debugging pose estimation
+**GOAL:** See what vision sees, tune parameters
+
+### Layout
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│  VISION TUNING                                                 Team 5684  │
+├───────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  CAMERA STATUS                                                            │
+│  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐          │
+│  │  FRONT CAMERA    │ │  BACK CAMERA     │ │  SIDE CAMERA     │          │
+│  │  Connected: ✓    │ │  Connected: ✓    │ │  Connected: ✗    │          │
+│  │  Targets: 2      │ │  Targets: 1      │ │  Targets: 0      │          │
+│  │  Latency: 22ms   │ │  Latency: 25ms   │ │  Latency: --     │          │
+│  └──────────────────┘ └──────────────────┘ └──────────────────┘          │
+│                                                                           │
+│  POSE COMPARISON                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                     │  │
+│  │   Odometry Pose:    X: 3.24   Y: 5.67   Rot: 45.2°                 │  │
+│  │   Vision Pose:      X: 3.21   Y: 5.65   Rot: 45.0°                 │  │
+│  │   Difference:       X: 0.03   Y: 0.02   Rot: 0.2°                  │  │
+│  │                                                                     │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│  POSE QUALITY                                                             │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐            │
+│  │  AMBIGUITY │ │  TAG COUNT │ │  ACCEPTED  │ │  REJECTED  │            │
+│  │    0.12    │ │      3     │ │     142    │ │      7     │            │
+│  └────────────┘ └────────────┘ └────────────┘ └────────────┘            │
+│                                                                           │
+│  TUNING PARAMETERS (Writable)                                             │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  Max Ambiguity:     [0.20]     Vision/MaxAmbiguity                 │  │
+│  │  Max Speed Filter:  [2.0 m/s]  Vision/MaxSpeedForVision            │  │
+│  │  Vision Enabled:    [  ✓  ]    Vision/Enabled                      │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### NetworkTables Keys - Per Camera
+
+Replace `{Camera}` with camera name (e.g., `FrontCamera`, `BackCamera`):
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Vision/{Camera}/Connected` | Boolean | Camera communication OK |
+| `Vision/{Camera}/HasTargets` | Boolean | Sees AprilTags |
+| `Vision/{Camera}/TargetCount` | Number | Number of tags visible |
+| `Vision/{Camera}/Latency` | Number | Pipeline latency (ms) |
+| `Vision/{Camera}/Ambiguity` | Number | Pose ambiguity (lower=better) |
+
+### NetworkTables Keys - Summary
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Vision/Healthy` | Boolean | Overall vision health |
+| `Vision/AnyTargetsVisible` | Boolean | Any camera sees tags |
+| `Vision/TotalTagCount` | Number | Total tags across all cameras |
+| `Vision/PosesAccepted` | Number | Accepted pose updates (session) |
+| `Vision/PosesRejected` | Number | Rejected pose updates (session) |
+
+### NetworkTables Keys - Tuning (Writable)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `Vision/Enabled` | Boolean | TRUE | Kill switch for vision updates |
+| `Vision/MaxAmbiguity` | Number | 0.2 | Reject poses above this |
+| `Vision/MaxSpeedForVision` | Number | 2.0 | Disable vision when moving fast |
+
+### NetworkTables Keys - Pose Comparison
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Drive/PoseX` | Number | Fused pose X (meters) |
+| `Drive/PoseY` | Number | Fused pose Y (meters) |
+| `Drive/PoseRotation` | Number | Fused pose rotation (degrees) |
+| `Vision/LatestPoseX` | Number | Raw vision X (meters) |
+| `Vision/LatestPoseY` | Number | Raw vision Y (meters) |
+| `Vision/LatestPoseRot` | Number | Raw vision rotation (degrees) |
+
+---
+
+## 4. Software Dashboard
+
+**WHO:** Programmers
+**WHEN:** Debugging, PID tuning, development
+**GOAL:** Deep system visibility, tunable parameters
+
+### Layout
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│  SOFTWARE DEBUG                                                Team 5684  │
+├───────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  SWERVE MODULES                                                           │
+│  ┌────────────────┐ ┌────────────────┐ ┌────────────────┐ ┌────────────┐ │
+│  │   FRONT LEFT   │ │  FRONT RIGHT   │ │   REAR LEFT    │ │ REAR RIGHT │ │
+│  │  Vel: 2.3 m/s  │ │  Vel: 2.2 m/s  │ │  Vel: 2.4 m/s  │ │ Vel: 2.3   │ │
+│  │  Ang: 45.2°    │ │  Ang: 44.8°    │ │  Ang: 45.5°    │ │ Ang: 45.1° │ │
+│  │  Temp: 42°C    │ │  Temp: 43°C    │ │  Temp: 41°C    │ │ Temp: 42°C │ │
+│  └────────────────┘ └────────────────┘ └────────────────┘ └────────────────┘
+│                                                                           │
+│  CAN BUS HEALTH                                                           │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐             │
+│  │    BUS     │ │   TX FULL  │ │  RX ERROR  │ │  TX ERROR  │             │
+│  │    24%     │ │      0     │ │      0     │ │      0     │             │
+│  └────────────┘ └────────────┘ └────────────┘ └────────────┘             │
+│                                                                           │
+│  SYSTEM                                                                   │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐             │
+│  │  BATTERY   │ │  BROWNOUT  │ │  CPU TEMP  │ │  LOOP TIME │             │
+│  │   12.4V    │ │  [GREEN]   │ │    45°C    │ │   18.2ms   │             │
+│  └────────────┘ └────────────┘ └────────────┘ └────────────┘             │
+│                                                                           │
+│  PID TUNING (Writable)                                                    │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  Drive P: [0.04]   I: [0.0]   D: [0.0]   Tune/Drive/*              │  │
+│  │  Turn P:  [1.0]    I: [0.0]   D: [0.0]   Tune/Turn/*               │  │
+│  │  Rot P:   [3.0]    I: [0.0]   D: [0.0]   Tune/Rotation/*           │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│  PRACTICE MODE                                                            │
+│  ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐       │
+│  │  ENABLED          │ │ WE'RE INACTIVE    │ │    RESTART        │       │
+│  │    [  ✓  ]        │ │  FIRST [  ✓  ]    │ │    [BUTTON]       │       │
+│  │Practice/Enabled   │ │Practice/WeAre...  │ │ Practice/Restart  │       │
+│  └───────────────────┘ └───────────────────┘ └───────────────────┘       │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### NetworkTables Keys - Module Data
+
+Replace `{Module}` with `FL`, `FR`, `RL`, `RR`:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Drive/{Module}/Velocity` | Number | Wheel velocity (m/s) |
+| `Drive/{Module}/Angle` | Number | Wheel angle (degrees) |
+| `Drive/{Module}/DriveTemp` | Number | Drive motor temp (°C) |
+| `Drive/{Module}/TurnTemp` | Number | Turn motor temp (°C) |
+| `Drive/{Module}/DriveCurrent` | Number | Drive motor current (A) |
+
+### NetworkTables Keys - CAN Bus
+
+| Key | Type | Healthy Value |
+|-----|------|---------------|
+| `CAN/PercentUtilization` | Number | < 70% |
+| `CAN/BusOffCount` | Number | 0 |
+| `CAN/TxFullCount` | Number | 0 |
+| `CAN/ReceiveErrorCount` | Number | 0 |
+| `CAN/TransmitErrorCount` | Number | 0 |
+
+### NetworkTables Keys - System
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `System/BatteryVoltage` | Number | Battery voltage |
+| `System/Brownout` | Boolean | TRUE = brownout detected |
+| `System/CPUTemp` | Number | RoboRIO CPU temp |
+| `System/LoopTime` | Number | Main loop time (ms) |
+| `System/MemoryUsage` | Number | Memory usage (%) |
+
+### NetworkTables Keys - PID Tuning (Writable)
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Tune/Drive/P` | Number | Drive motor kP |
+| `Tune/Drive/I` | Number | Drive motor kI |
+| `Tune/Drive/D` | Number | Drive motor kD |
+| `Tune/Turn/P` | Number | Turn motor kP |
+| `Tune/Turn/I` | Number | Turn motor kI |
+| `Tune/Turn/D` | Number | Turn motor kD |
+| `Tune/Rotation/P` | Number | Rotation controller kP |
+| `Tune/Rotation/I` | Number | Rotation controller kI |
+| `Tune/Rotation/D` | Number | Rotation controller kD |
+
+### NetworkTables Keys - Practice Mode
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Practice/Enabled` | Boolean | Toggle practice mode |
+| `Practice/WeAreInactiveFirst` | Boolean | Which scenario to practice |
+| `Practice/Restart` | Boolean | Restart from Shift 1 |
+| `Practice/CycleNumber` | Number | Current cycle count |
+| `Practice/TotalElapsed` | Number | Total practice time |
+
+---
+
+## Practice Mode
+
+Practice mode simulates match shift timing for driver training.
+
+### Starting Practice
+
+1. Go to Software Dashboard (or add these to any dashboard)
+2. Set `Practice/WeAreInactiveFirst` for the scenario you want
+3. Toggle `Practice/Enabled` to TRUE
+4. Practice starts immediately - works even when disabled!
+
+### Cycle
+
+```
+100-SECOND PRACTICE CYCLE (loops forever)
+═══════════════════════════════════════════════════════════════════════════════
+
+  Shift 1 (25s)     Shift 2 (25s)     Shift 3 (25s)     Shift 4 (25s)
+ ───────────────   ───────────────   ───────────────   ───────────────
+    INACTIVE   →      ACTIVE     →     INACTIVE    →      ACTIVE
+                                                              │
+                          ┌───────────────────────────────────┘
+                          │
+                          └─────────────→  LOOPS BACK TO SHIFT 1
+```
+
+LEDs and warnings work exactly like a real match.
 
 ---
 
 ## AdvantageScope Usage
 
-### Viewing Logs
+### When to Use AdvantageScope
 
-1. Run your robot (real or simulation)
-2. Log files are saved to USB drive on RoboRIO
-3. Open log file in AdvantageScope
+- **Post-match analysis** - Review what happened
+- **Tuning** - Graph PID response curves
+- **Debugging** - Find exactly when something failed
+- **Vision** - Compare odometry vs vision poses in 3D
 
-### Recommended AdvantageScope Views
+### Recommended Views
 
-**Pose Visualization:**
-- Add `Drive/Pose` as a "Robot" object on the 2D field
-- Add `Vision/Summary/TagPoses` as "Vision Target" objects
-- Add `Vision/Summary/RobotPosesAccepted` as green "Ghost" objects
-- Add `Vision/Summary/RobotPosesRejected` as red "Ghost" objects
+**Pose Visualization (3D Field):**
+- Robot pose: `Drive/Pose`
+- Vision targets: `Vision/Summary/TagPoses`
+- Accepted estimates: `Vision/Summary/RobotPosesAccepted` (green)
+- Rejected estimates: `Vision/Summary/RobotPosesRejected` (red)
 
-**Match Analysis:**
+**Match Timing:**
 - Graph `Match/ShiftCountdown` to see timing
-- Graph `Hub/DistanceInches` to analyze positioning
-- Overlay with `Match/HubActive` to correlate scoring windows
+- Overlay with `Match/HubActive` to see scoring windows
 
-**Vision Debugging:**
-- Compare `Drive/PoseX/Y` with vision estimates
-- Look for jumps when `Vision/*/RobotPosesRejected` is populated
-- Check `Vision/*/Ambiguity` values at problem moments
-
----
-
-## 2026 REBUILT Match Dashboard
-
-### Game Context
-
-The REBUILT game has alternating hub activation:
-- **AUTO (20s)**: Both hubs active
-- **TRANSITION (10s)**: Both hubs active, FMS data arrives
-- **SHIFTS 1-4 (25s each)**: Alternating hub activation
-- **ENDGAME (30s)**: Both hubs active, focus on climbing
-
-### Warning System
-
-| Warning | NetworkTables Key Value | Driver Action |
-|---------|------------------------|---------------|
-| `Match/Warning = "CLEAR ZONE!"` | Hub closing in 9s | Flush fuel, exit zone |
-| `Match/Warning = "GET READY!"` | Hub opening in 9s | Position to score |
-| `Match/Warning = "ENDGAME SOON"` | 30s remaining | Prepare climb |
-| `Match/Warning = "CLIMB NOW!"` | 15s remaining | Execute climb |
-| `Match/Warning = "GO GO GO!"` | 5s remaining | Emergency climb |
-
-### FMS Data
-
-The game-specific message ('R' or 'B') indicates which alliance's hub is inactive during Shifts 1 & 3:
-- Arrives ~3 seconds after Auto ends
-- `Match/FmsDataReceived` turns TRUE when received
-- `Match/WeAreFirst` shows strategic positioning info
+**Driver Inputs (Replay):**
+- `Inputs/DriverLeftX`, `Inputs/DriverLeftY`
+- `Inputs/DriverRightX`
+- Replay exactly what the driver did
 
 ---
 
-## Practice Mode (Shift Timing Training)
+## LED System
 
-Practice mode lets your team train on the 25-second shift timing without running full matches.
-
-### Starting Practice Mode
-
-1. Open Elastic dashboard
-2. Set `Practice/WeAreInactiveFirst` to configure the scenario:
-   - **TRUE** = We're inactive in Shifts 1 & 3 (practice defense positioning)
-   - **FALSE** = We're active in Shifts 1 & 3 (practice scoring windows)
-3. Toggle `Practice/Enabled` to **TRUE**
-4. Practice starts immediately - no need to enable the robot!
-
-### What Happens
-
-```
-PRACTICE MODE CYCLE (100 seconds, loops forever)
-═══════════════════════════════════════════════════════════════════════════════
-
-    Shift 1 (25s)     Shift 2 (25s)     Shift 3 (25s)     Shift 4 (25s)
-  ┌───────────────┐ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
-  │   INACTIVE    │ │    ACTIVE     │ │   INACTIVE    │ │    ACTIVE     │
-  │  (if first)   │ │               │ │  (if first)   │ │               │
-  └───────────────┘ └───────────────┘ └───────────────┘ └───────────────┘
-        │                 │                 │                 │
-        └─────────────────┴─────────────────┴─────────────────┘
-                                    │
-                              LOOPS BACK TO
-                                SHIFT 1
-```
-
-### LEDs and Warnings Work Normally
-
-- LEDs show the same patterns as a real match
-- Warnings fire at the same timing (9s before shift, 3s before shift)
-- Dashboard shows `[PRACTICE]` prefix on phase name
-
-### Restarting Practice
-
-- Set `Practice/Restart` to TRUE to jump back to Shift 1
-- Useful for repeating a specific transition
-
-### Stopping Practice
-
-- Toggle `Practice/Enabled` to FALSE
-- Returns to normal pre-match state
-
----
-
-## Testing at Home (Simulation)
-
-You can test the dashboard without hardware:
-
-```bash
-./gradlew simulateJava
-```
-
-Then:
-1. Open Elastic and connect to `localhost`
-2. Use the WPILib Simulation GUI to control match state
-3. Use Practice Mode to test shift timing (toggle `Practice/Enabled`)
-4. Or call `matchStateTracker.setFmsDataForTesting('R')` to simulate FMS data
+The LED system automatically shows match state. See [LEDSystem.md](LEDSystem.md) for:
+- LED behavior by match phase
+- Hardware setup options
+- Interrupt system for custom states
 
 ---
 
@@ -386,20 +471,13 @@ Then:
 
 | File | Purpose |
 |------|---------|
-| `DashboardSetup.java` | Publishes all data to NetworkTables |
-| `MatchStateTracker.java` | Calculates hub status, phases, warnings, practice mode |
+| `DashboardSetup.java` | Publishes data to NetworkTables |
+| `MatchStateTracker.java` | Hub status, phases, warnings, practice mode |
 | `MatchConstants.java` | Timing values for match phases |
-| `DriveSubsystem.java` | Publishes drive and hub distance data |
-| `VisionSubsystem.java` | Publishes vision health and target data |
-| `LEDSubsystem.java` | LED control with match state integration |
-| `LEDSystem.md` | Complete LED system documentation |
+| `DriveSubsystem.java` | Drive and pose data |
+| `UtilityCommands.java` | Pit setup commands |
+| `LEDSubsystem.java` | LED control |
 
 ---
 
-## Related Documentation
-
-- **[LEDSystem.md](LEDSystem.md)** - Complete LED system guide including hardware setup, interrupt system, and customization
-
----
-
-*Document created for Team 5684 - Elastic + AdvantageScope dashboard guide for 2026 REBUILT*
+*Dashboard Guide for Team 5684 - 2026 REBUILT*

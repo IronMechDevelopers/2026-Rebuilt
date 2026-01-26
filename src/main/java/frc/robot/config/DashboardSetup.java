@@ -10,6 +10,7 @@ import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
+import frc.robot.commands.UtilityCommands;
 import frc.robot.constants.VisionConstants;
 import frc.robot.subsystems.DriveSubsystem;
 import frc.robot.subsystems.MatchStateTracker;
@@ -102,6 +103,13 @@ public class DashboardSetup {
     // Initialize default values
     SmartDashboard.putBoolean("Vision/Enabled", true);
     SmartDashboard.putBoolean("Vision/ClassroomMode", false);
+
+    // Initialize Pit Mode command buttons (all false by default)
+    SmartDashboard.putBoolean("Pit/SetWheelsStraight", false);
+    SmartDashboard.putBoolean("Pit/ZeroHeading", false);
+    SmartDashboard.putBoolean("Pit/CoastMode", false);
+    SmartDashboard.putBoolean("Pit/BrakeMode", false);
+    SmartDashboard.putBoolean("Pit/ForceVisionReset", false);
   }
 
   /**
@@ -109,6 +117,11 @@ public class DashboardSetup {
    * Call this from Robot.robotPeriodic().
    */
   public void periodic() {
+    // ═══════════════════════════════════════════════════════════════════════
+    // PIT MODE COMMANDS (check for button presses)
+    // ═══════════════════════════════════════════════════════════════════════
+    checkPitCommands();
+
     // ═══════════════════════════════════════════════════════════════════════
     // MATCH STATE (2026 REBUILT - Hub status and warnings)
     // ═══════════════════════════════════════════════════════════════════════
@@ -230,6 +243,51 @@ public class DashboardSetup {
     else if (voltage >= 11.0) batteryStatus = "OK";
     else batteryStatus = "LOW";
     SmartDashboard.putString("System/BatteryStatus", batteryStatus);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PIT MODE COMMANDS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Checks for Pit Mode button presses and triggers commands.
+   * Buttons auto-reset after triggering.
+   */
+  private void checkPitCommands() {
+    // Set Wheels Straight
+    if (SmartDashboard.getBoolean("Pit/SetWheelsStraight", false)) {
+      SmartDashboard.putBoolean("Pit/SetWheelsStraight", false);
+      UtilityCommands.setStraightAhead(driveSubsystem).schedule();
+      System.out.println("PIT: Setting wheels straight");
+    }
+
+    // Zero Heading
+    if (SmartDashboard.getBoolean("Pit/ZeroHeading", false)) {
+      SmartDashboard.putBoolean("Pit/ZeroHeading", false);
+      UtilityCommands.zeroHeading(driveSubsystem).schedule();
+      System.out.println("PIT: Zeroing heading");
+    }
+
+    // Coast Mode
+    if (SmartDashboard.getBoolean("Pit/CoastMode", false)) {
+      SmartDashboard.putBoolean("Pit/CoastMode", false);
+      UtilityCommands.setCoastMode(driveSubsystem).schedule();
+      System.out.println("PIT: Motors set to COAST mode");
+    }
+
+    // Brake Mode
+    if (SmartDashboard.getBoolean("Pit/BrakeMode", false)) {
+      SmartDashboard.putBoolean("Pit/BrakeMode", false);
+      UtilityCommands.setBrakeMode(driveSubsystem).schedule();
+      System.out.println("PIT: Motors set to BRAKE mode");
+    }
+
+    // Force Vision Reset
+    if (SmartDashboard.getBoolean("Pit/ForceVisionReset", false)) {
+      SmartDashboard.putBoolean("Pit/ForceVisionReset", false);
+      UtilityCommands.forceVisionReset(driveSubsystem).schedule();
+      System.out.println("PIT: Forcing vision reset");
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
