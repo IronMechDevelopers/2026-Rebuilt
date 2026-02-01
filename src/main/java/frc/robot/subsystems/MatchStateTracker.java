@@ -127,17 +127,7 @@ public class MatchStateTracker extends SubsystemBase {
     // =========================================================================
 
     public MatchStateTracker() {
-        // Initialize dashboard defaults
-        SmartDashboard.putString("Match/Phase", "Pre-Match");
-        SmartDashboard.putString("Match/HubStatus", "UNKNOWN");
-        SmartDashboard.putString("Match/NextStatus", "UNKNOWN");
-        SmartDashboard.putNumber("Match/TimeInPhase", 0);
-        SmartDashboard.putNumber("Match/TimeUntilShift", 0);
-        SmartDashboard.putString("Match/Warning", "");
-        SmartDashboard.putBoolean("Match/FmsDataReceived", false);
-        SmartDashboard.putString("Match/FirstInactive", "WAITING...");
-
-        // Practice mode controls
+        // Practice mode controls (read/write for dashboard interaction)
         SmartDashboard.putBoolean("Practice/Enabled", false);
         SmartDashboard.putBoolean("Practice/WeAreInactiveFirst", true);
         SmartDashboard.putBoolean("Practice/Restart", false);
@@ -213,10 +203,7 @@ public class MatchStateTracker extends SubsystemBase {
             updateWarnings();
         }
 
-        // Update dashboard
-        updateDashboard();
-
-        // AdvantageKit logging
+        // AdvantageKit logging (streams to NT via NT4Publisher)
         logToAdvantageKit();
     }
 
@@ -445,57 +432,22 @@ public class MatchStateTracker extends SubsystemBase {
     // =========================================================================
 
     /**
-     * Updates SmartDashboard with current match state.
-     */
-    private void updateDashboard() {
-        // Add practice mode indicator to phase display
-        String phaseDisplay = currentPhase.getDisplayName();
-        if (practiceMode) {
-            phaseDisplay = "[PRACTICE] " + phaseDisplay;
-        }
-
-        SmartDashboard.putString("Match/Phase", phaseDisplay);
-        SmartDashboard.putString("Match/HubStatus", ourHubStatus.getDisplayName());
-        SmartDashboard.putString("Match/NextStatus", nextHubStatus.getDisplayName());
-        SmartDashboard.putNumber("Match/TimeInPhase", timeInPhase);
-        SmartDashboard.putNumber("Match/TimeUntilShift", timeUntilNextShift);
-        SmartDashboard.putString("Match/Warning", currentWarning.getMessage());
-        SmartDashboard.putBoolean("Match/FmsDataReceived", fmsDataReceived || practiceMode);
-        SmartDashboard.putBoolean("Match/HubActive", ourHubStatus == HubStatus.ACTIVE);
-        SmartDashboard.putBoolean("Match/HasWarning", currentWarning != WarningLevel.NONE);
-        SmartDashboard.putBoolean("Match/PracticeMode", practiceMode);
-
-        // Show which alliance is inactive first (once known)
-        if (practiceMode) {
-            SmartDashboard.putString("Match/FirstInactive", practiceWeAreInactiveFirst ? "US" : "THEM");
-            SmartDashboard.putString("Match/WeAreFirst",
-                practiceWeAreInactiveFirst ? "WE'RE INACTIVE FIRST" : "THEY'RE INACTIVE FIRST");
-        } else if (fmsDataReceived) {
-            String firstInactive = (fmsInactiveCode == MatchConstants.kRedInactiveCode) ? "RED" : "BLUE";
-            SmartDashboard.putString("Match/FirstInactive", firstInactive);
-
-            // Show if WE are inactive first (more useful for drivers)
-            boolean weAreFirst = isOurAllianceInactiveInOddShifts();
-            SmartDashboard.putString("Match/WeAreFirst",
-                weAreFirst ? "WE'RE INACTIVE FIRST" : "THEY'RE INACTIVE FIRST");
-        }
-
-        // Countdown display for drivers (large numbers)
-        SmartDashboard.putNumber("Match/ShiftCountdown", Math.ceil(timeUntilNextShift));
-    }
-
-    /**
      * Logs match state to AdvantageKit for replay analysis.
+     * DashboardSetup reads data directly from subsystem methods.
      */
     private void logToAdvantageKit() {
-        Logger.recordOutput("Match/Phase", currentPhase.toString());
-        Logger.recordOutput("Match/HubStatus", ourHubStatus.toString());
-        Logger.recordOutput("Match/NextStatus", nextHubStatus.toString());
+        // Phase with practice indicator
+        String phaseDisplay = practiceMode ? "[PRACTICE] " + currentPhase.getDisplayName() : currentPhase.getDisplayName();
+
+        Logger.recordOutput("Match/Phase", phaseDisplay);
+        Logger.recordOutput("Match/HubStatus", ourHubStatus.getDisplayName());
+        Logger.recordOutput("Match/NextStatus", nextHubStatus.getDisplayName());
         Logger.recordOutput("Match/TimeInPhase", timeInPhase);
         Logger.recordOutput("Match/TimeUntilShift", timeUntilNextShift);
-        Logger.recordOutput("Match/Warning", currentWarning.toString());
-        Logger.recordOutput("Match/FmsDataReceived", fmsDataReceived);
+        Logger.recordOutput("Match/ShiftCountdown", Math.ceil(timeUntilNextShift));
+        Logger.recordOutput("Match/Warning", currentWarning.getMessage());
         Logger.recordOutput("Match/HubActive", ourHubStatus == HubStatus.ACTIVE);
+        Logger.recordOutput("Match/FmsDataReceived", fmsDataReceived || practiceMode);
         Logger.recordOutput("Match/Alliance", ourAlliance.toString());
         Logger.recordOutput("Match/PracticeMode", practiceMode);
     }
@@ -620,9 +572,9 @@ public class MatchStateTracker extends SubsystemBase {
         // Calculate warnings (same logic as normal mode)
         updateWarnings();
 
-        // Log practice cycle info
-        SmartDashboard.putNumber("Practice/CycleNumber", (int) (elapsed / cycleTime) + 1);
-        SmartDashboard.putNumber("Practice/TotalElapsed", elapsed);
+        // Log practice cycle info to AdvantageKit
+        Logger.recordOutput("Practice/CycleNumber", (int) (elapsed / cycleTime) + 1);
+        Logger.recordOutput("Practice/TotalElapsed", elapsed);
     }
 
     // =========================================================================

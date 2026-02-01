@@ -84,6 +84,10 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
     // Currently visible AprilTag field positions (for AdvantageScope visualization)
     private Pose2d[] visibleTagPoses = new Pose2d[0];
 
+    // Accepted and rejected tag poses (3D for proper field visualization)
+    private Pose3d[] acceptedTagPoses = new Pose3d[0];
+    private Pose3d[] rejectedTagPoses = new Pose3d[0];
+
     // Session counters for dashboard (cumulative since boot)
     private int posesAcceptedTotal = 0;
     private int posesRejectedTotal = 0;
@@ -179,6 +183,30 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
     }
 
     /**
+     * Returns the 3D field positions of AprilTags that were ACCEPTED for localization.
+     *
+     * <p>These tags passed all filtering criteria and contributed to the pose estimate.
+     *
+     * @return Array of accepted tag field positions (empty if none accepted)
+     */
+    @Override
+    public Pose3d[] getAcceptedTagPoses() {
+        return acceptedTagPoses;
+    }
+
+    /**
+     * Returns the 3D field positions of AprilTags that were REJECTED.
+     *
+     * <p>These tags were detected but filtered out due to high ambiguity, distance, etc.
+     *
+     * @return Array of rejected tag field positions (empty if none rejected)
+     */
+    @Override
+    public Pose3d[] getRejectedTagPoses() {
+        return rejectedTagPoses;
+    }
+
+    /**
      * Returns the number of consecutive failures (resets on success).
      */
     public int getConsecutiveFailures() {
@@ -234,9 +262,19 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
         List<Pose3d> allAcceptedPoses = new ArrayList<>();
         List<Pose3d> allRejectedPoses = new ArrayList<>();
 
+        // Track which TAG poses were accepted vs rejected (for AdvantageScope visualization)
+        List<Pose3d> acceptedTags = new ArrayList<>();
+        List<Pose3d> rejectedTags = new ArrayList<>();
+
+        // Track tag distances for calibration (tape measure verification)
+        List<Integer> tagIds = new ArrayList<>();
+        List<Double> tagDistancesMeters = new ArrayList<>();
+
         // Safety: Master Kill Switch
         if (!SmartDashboard.getBoolean("Vision/Enabled", true) || fieldLayout == null || cameras.isEmpty()) {
             visibleTagPoses = new Pose2d[0];
+            acceptedTagPoses = new Pose3d[0];
+            rejectedTagPoses = new Pose3d[0];
             logEmptyVisionData();
             return validEstimates;
         }
@@ -275,12 +313,17 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
 
                 var pipelineResult = results.get(results.size() - 1); // Get the very latest
 
-                // Collect visible tag poses from the pipeline result
+                // Collect visible tag poses and distances from the pipeline result
                 for (var target : pipelineResult.getTargets()) {
                     var tagPose = fieldLayout.getTagPose(target.getFiducialId());
                     if (tagPose.isPresent()) {
                         cameraTagPoses.add(tagPose.get());
                         allTagPoses.add(tagPose.get());
+
+                        // Track distance for calibration (camera to tag)
+                        double distanceMeters = target.getBestCameraToTarget().getTranslation().getNorm();
+                        tagIds.add(target.getFiducialId());
+                        tagDistancesMeters.add(distanceMeters);
                     }
                 }
 
@@ -307,13 +350,24 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
                         }
                     }
 
+                    // Track which TAG poses contributed to this estimate
+                    List<Pose3d> contributingTags = new ArrayList<>();
+                    for (var target : estimate.targetsUsed) {
+                        var tagPose = fieldLayout.getTagPose(target.getFiducialId());
+                        if (tagPose.isPresent()) {
+                            contributingTags.add(tagPose.get());
+                        }
+                    }
+
                     if (rejected) {
                         cameraRejectedPoses.add(robotPose3d);
                         allRejectedPoses.add(robotPose3d);
+                        rejectedTags.addAll(contributingTags);
                         posesRejectedTotal++;
                     } else {
                         cameraAcceptedPoses.add(robotPose3d);
                         allAcceptedPoses.add(robotPose3d);
+                        acceptedTags.addAll(contributingTags);
                         validEstimates.add(estimate);
                         debugPose = robotPose3d.toPose2d();
                         posesAcceptedTotal++;
@@ -329,16 +383,31 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
             }
         }
 
-        // Log summary (all cameras combined) in AdvantageKit format
-        Logger.recordOutput("Vision/Summary/TagPoses", allTagPoses.toArray(new Pose3d[0]));
-        Logger.recordOutput("Vision/Summary/RobotPoses", allRobotPoses.toArray(new Pose3d[0]));
-        Logger.recordOutput("Vision/Summary/RobotPosesAccepted", allAcceptedPoses.toArray(new Pose3d[0]));
-        Logger.recordOutput("Vision/Summary/RobotPosesRejected", allRejectedPoses.toArray(new Pose3d[0]));
-
-        // Dashboard keys (per best practices doc)
+        // AdvantageKit logging (for replay in AdvantageScope)
         Logger.recordOutput("Vision/TotalTagCount", allTagPoses.size());
         Logger.recordOutput("Vision/PosesAccepted", posesAcceptedTotal);
         Logger.recordOutput("Vision/PosesRejected", posesRejectedTotal);
+
+        // Tag distance logging for calibration (tape measure verification)
+        // Log arrays for AdvantageScope
+        Logger.recordOutput("Vision/Calibration/TagIDs", tagIds.stream().mapToLong(i -> i).toArray());
+        Logger.recordOutput("Vision/Calibration/DistancesMeters", tagDistancesMeters.stream().mapToDouble(d -> d).toArray());
+
+        // Log human-readable format for SmartDashboard (pit display)
+        StringBuilder calibrationStr = new StringBuilder();
+        for (int i = 0; i < tagIds.size(); i++) {
+            if (i > 0) calibrationStr.append(" | ");
+            double meters = tagDistancesMeters.get(i);
+            double inches = meters * 39.3701;
+            calibrationStr.append(String.format("Tag %d: %.2fm (%.1fin)", tagIds.get(i), meters, inches));
+        }
+        SmartDashboard.putString("Vision/Calibration/Distances",
+            calibrationStr.length() > 0 ? calibrationStr.toString() : "No tags visible");
+
+        // SmartDashboard (only values needed by DashboardSetup)
+        SmartDashboard.putNumber("Vision/TotalTagCount", allTagPoses.size());
+        SmartDashboard.putNumber("Vision/PosesAccepted", posesAcceptedTotal);
+        SmartDashboard.putNumber("Vision/PosesRejected", posesRejectedTotal);
 
         // Update visible tag poses for external access (2D for compatibility)
         List<Pose2d> tagPoses2d = new ArrayList<>();
@@ -346,6 +415,26 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
             tagPoses2d.add(p.toPose2d());
         }
         visibleTagPoses = tagPoses2d.toArray(new Pose2d[0]);
+
+        // Update accepted/rejected tag poses for external access (3D for AdvantageScope)
+        acceptedTagPoses = acceptedTags.toArray(new Pose3d[0]);
+        rejectedTagPoses = rejectedTags.toArray(new Pose3d[0]);
+
+        // SIMULATION TEST: Inject fake tags to verify AdvantageScope visualization
+        // TODO: Remove this block before competition!
+        if (!edu.wpi.first.wpilibj.RobotBase.isReal() && acceptedTags.isEmpty() && rejectedTags.isEmpty()) {
+            // Add Tag 26, 28 as accepted, Tag 1 as rejected
+            var tag26 = fieldLayout.getTagPose(26);
+            var tag28 = fieldLayout.getTagPose(28);
+            var tag1 = fieldLayout.getTagPose(1);
+            if (tag26.isPresent() && tag28.isPresent()) {
+                acceptedTagPoses = new Pose3d[] { tag26.get(), tag28.get() };
+            }
+            if (tag1.isPresent()) {
+                rejectedTagPoses = new Pose3d[] { tag1.get() };
+            }
+        }
+        // Note: DriveSubsystem logs these to Odometry/AcceptedTags and Odometry/RejectedTags
 
         // Track success/failure for health monitoring
         if (!validEstimates.isEmpty()) {
@@ -359,33 +448,25 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
     }
 
     /**
-     * Logs vision data for a single camera in AdvantageKit format.
+     * Per-camera logging hook (currently minimal - tag data consolidated in Odometry/).
      */
     private void logCameraVisionData(String cameraName, List<Pose3d> tagPoses,
             List<Pose3d> robotPoses, List<Pose3d> accepted, List<Pose3d> rejected) {
-        String base = "Vision/" + cameraName;
-        Logger.recordOutput(base + "/TagPoses", tagPoses.toArray(new Pose3d[0]));
-        Logger.recordOutput(base + "/RobotPoses", robotPoses.toArray(new Pose3d[0]));
-        Logger.recordOutput(base + "/RobotPosesAccepted", accepted.toArray(new Pose3d[0]));
-        Logger.recordOutput(base + "/RobotPosesRejected", rejected.toArray(new Pose3d[0]));
+        // Per-camera pose data removed to reduce log size.
+        // Consolidated tag logging is in DriveSubsystem -> Odometry/AcceptedTags, Odometry/RejectedTags
     }
 
     /**
-     * Logs empty arrays when vision is disabled.
+     * Logs empty/zero values when vision is disabled or no data available.
      */
     private void logEmptyVisionData() {
-        Pose3d[] empty = new Pose3d[0];
-        for (PhotonCamera camera : cameras) {
-            String base = "Vision/" + camera.getName();
-            Logger.recordOutput(base + "/TagPoses", empty);
-            Logger.recordOutput(base + "/RobotPoses", empty);
-            Logger.recordOutput(base + "/RobotPosesAccepted", empty);
-            Logger.recordOutput(base + "/RobotPosesRejected", empty);
-        }
-        Logger.recordOutput("Vision/Summary/TagPoses", empty);
-        Logger.recordOutput("Vision/Summary/RobotPoses", empty);
-        Logger.recordOutput("Vision/Summary/RobotPosesAccepted", empty);
-        Logger.recordOutput("Vision/Summary/RobotPosesRejected", empty);
+        Logger.recordOutput("Vision/TotalTagCount", 0);
+        Logger.recordOutput("Vision/PosesAccepted", posesAcceptedTotal);
+        Logger.recordOutput("Vision/PosesRejected", posesRejectedTotal);
+        Logger.recordOutput("Vision/Calibration/TagIDs", new long[0]);
+        Logger.recordOutput("Vision/Calibration/DistancesMeters", new double[0]);
+        SmartDashboard.putString("Vision/Calibration/Distances", "No tags visible");
+        // Note: DriveSubsystem handles Odometry/AcceptedTags and Odometry/RejectedTags
     }
 
     /**
@@ -497,184 +578,69 @@ public class VisionSubsystem extends SubsystemBase implements VisionProvider {
             healthStatus = "DISABLED - no cameras";
         } else if (tooManyFailures) {
             visionHealthy = false;
-            healthStatus = "UNHEALTHY - " + consecutiveFailures + " consecutive failures";
+            healthStatus = "UNHEALTHY - " + consecutiveFailures + " failures";
         } else {
             visionHealthy = true;
             healthStatus = "HEALTHY";
         }
 
-        // Log health status (only when it changes or every 50 cycles for dashboard updates)
-        SmartDashboard.putBoolean("Vision/Healthy", visionHealthy);
-        SmartDashboard.putString("Vision/HealthStatus", healthStatus);
-        SmartDashboard.putNumber("Vision/ConsecutiveFailures", consecutiveFailures);
-        SmartDashboard.putNumber("Vision/TotalFailures", totalFailures);
-        SmartDashboard.putNumber("Vision/CameraCount", cameras.size());
-
-        // AdvantageKit logging
+        // AdvantageKit logging (primary - for replay in AdvantageScope)
         Logger.recordOutput("Vision/Healthy", visionHealthy);
-        Logger.recordOutput("Vision/ConsecutiveFailures", consecutiveFailures);
+        Logger.recordOutput("Vision/HealthStatus", healthStatus);
         Logger.recordOutput("Vision/CameraCount", cameras.size());
+        Logger.recordOutput("Vision/ConsecutiveFailures", consecutiveFailures);
+
+        // SmartDashboard (only values needed by DashboardSetup)
+        SmartDashboard.putNumber("Vision/CameraCount", cameras.size());
     }
 
     /**
-     * Logs vision data for dashboard display.
+     * Logs per-camera status for Shuffleboard dashboard.
+     * Only logs essential connection and target count data.
      *
      * <p><b>SAFETY:</b> Wrapped in try-catch. If logging fails, it doesn't affect robot operation.
-     *
-     * <p><b>PERFORMANCE:</b> Only logs detailed per-camera data every 5 cycles (~100ms)
-     * to reduce network traffic. Critical data (health, targets visible) logged every cycle.
      */
     private void logEnhancedVisionData() {
         try {
-            logEnhancedVisionDataInternal();
+            boolean visionEnabled = SmartDashboard.getBoolean("Vision/Enabled", true);
+            boolean anyConnected = false;
+            int totalTargets = 0;
+
+            for (PhotonCamera camera : cameras) {
+                try {
+                    String base = "Vision/" + camera.getName();
+                    boolean connected = camera.isConnected();
+
+                    // Log connection status (needed by DashboardSetup)
+                    SmartDashboard.putBoolean(base + "/Connected", connected);
+                    if (connected) anyConnected = true;
+
+                    if (!connected) {
+                        SmartDashboard.putNumber(base + "/TargetCount", 0);
+                        continue;
+                    }
+
+                    // Get target count from latest result
+                    var results = camera.getAllUnreadResults();
+                    int targetCount = 0;
+                    if (!results.isEmpty()) {
+                        targetCount = results.get(results.size() - 1).getTargets().size();
+                        totalTargets += targetCount;
+                    }
+                    SmartDashboard.putNumber(base + "/TargetCount", targetCount);
+
+                } catch (Exception e) {
+                    recordFailure("Camera logging: " + e.getMessage());
+                }
+            }
+
+            // AdvantageKit logging for replay
+            Logger.recordOutput("Vision/Available", visionEnabled && anyConnected);
+            Logger.recordOutput("Vision/TotalTargets", totalTargets);
+
         } catch (Exception e) {
-            // Logging failed - don't let it crash the robot
             recordFailure("Logging exception: " + e.getMessage());
         }
-    }
-
-    /**
-     * Internal implementation of vision logging.
-     */
-    private void logEnhancedVisionDataInternal() {
-        boolean visionEnabled = SmartDashboard.getBoolean("Vision/Enabled", true);
-        boolean anyConnected = false;
-        boolean anyTargetsVisible = false;
-
-        // Only log detailed per-camera data every 5 cycles to reduce bandwidth
-        boolean logDetailedData = (periodicLoopCounter % 5 == 0) || VisionConstants.kVerboseLogging;
-
-        PhotonTrackedTarget bestTarget = null;
-        PhotonTrackedTarget closestTarget = null;
-        double bestAmbiguity = Double.MAX_VALUE;
-        double closestDistance = Double.MAX_VALUE;
-        String bestCameraName = "None";
-        String closestCameraName = "None";
-
-        for (int i = 0; i < cameras.size(); i++) {
-            try {
-                PhotonCamera camera = cameras.get(i);
-                String base = "Vision/" + camera.getName();
-
-                // Always check and log connection (critical for debugging)
-                boolean connected = camera.isConnected();
-                SmartDashboard.putBoolean(base + "/Connected", connected);
-                if (connected) anyConnected = true;
-
-                if (!connected) {
-                    if (logDetailedData) {
-                        SmartDashboard.putBoolean(base + "/HasTargets", false);
-                        SmartDashboard.putNumber(base + "/TargetCount", 0);
-                    }
-                    continue;
-                }
-
-                // Get latest results
-                var results = camera.getAllUnreadResults();
-                if (results.isEmpty()) {
-                    if (logDetailedData) {
-                        SmartDashboard.putBoolean(base + "/HasTargets", false);
-                        SmartDashboard.putNumber(base + "/TargetCount", 0);
-                    }
-                    continue;
-                }
-
-                var latestResult = results.get(results.size() - 1);
-                var targets = latestResult.getTargets();
-
-                // Target visibility (always log - critical info)
-                boolean hasTargets = latestResult.hasTargets();
-                SmartDashboard.putBoolean(base + "/HasTargets", hasTargets);
-                SmartDashboard.putNumber(base + "/TargetCount", targets.size());
-                if (hasTargets) anyTargetsVisible = true;
-
-                // Detailed logging (rate-limited)
-                if (logDetailedData) {
-                    // Latency check (key name per dashboard spec)
-                    double latencyMs = latestResult.metadata.getLatencyMillis();
-                    boolean latencyOK = latencyMs <= VisionConstants.kMaxLatencyMs;
-                    SmartDashboard.putNumber(base + "/Latency", latencyMs);
-                    SmartDashboard.putBoolean(base + "/LatencyOK", latencyOK);
-
-                    // Build tag ID list and per-tag distance info
-                    StringBuilder tagIds = new StringBuilder();
-                    StringBuilder tagDistances = new StringBuilder();
-                    double cameraLowestAmbiguity = Double.MAX_VALUE;
-                    double cameraClosestDist = Double.MAX_VALUE;
-
-                    for (PhotonTrackedTarget target : targets) {
-                        if (tagIds.length() > 0) tagIds.append(", ");
-                        tagIds.append(target.getFiducialId());
-
-                        double ambiguity = target.getPoseAmbiguity();
-                        if (ambiguity < cameraLowestAmbiguity) cameraLowestAmbiguity = ambiguity;
-                        if (ambiguity < bestAmbiguity) {
-                            bestAmbiguity = ambiguity;
-                            bestTarget = target;
-                            bestCameraName = camera.getName();
-                        }
-
-                        double distance = target.getBestCameraToTarget().getTranslation().getNorm();
-
-                        // Build per-tag distance string for calibration verification
-                        if (tagDistances.length() > 0) tagDistances.append(", ");
-                        tagDistances.append(String.format("%d: %.2fm", target.getFiducialId(), distance));
-
-                        if (distance < cameraClosestDist) cameraClosestDist = distance;
-                        if (distance < closestDistance) {
-                            closestDistance = distance;
-                            closestTarget = target;
-                            closestCameraName = camera.getName();
-                        }
-                    }
-
-                    SmartDashboard.putString(base + "/TagIDs", tagIds.length() > 0 ? tagIds.toString() : "None");
-                    SmartDashboard.putString(base + "/TagDistances", tagDistances.length() > 0 ? tagDistances.toString() : "None");
-                    // Ambiguity key per dashboard spec
-                    SmartDashboard.putNumber(base + "/Ambiguity", cameraLowestAmbiguity < Double.MAX_VALUE ? cameraLowestAmbiguity : 0);
-                    SmartDashboard.putBoolean(base + "/AmbiguityOK", cameraLowestAmbiguity <= VisionConstants.kMaxAmbiguity);
-                    SmartDashboard.putNumber(base + "/ClosestDistance", cameraClosestDist < Double.MAX_VALUE ? cameraClosestDist : 0);
-                }
-            } catch (Exception e) {
-                // Per-camera logging failed - continue with other cameras
-                recordFailure("Logging camera " + i + ": " + e.getMessage());
-            }
-        }
-
-        // Always log critical status
-        SmartDashboard.putBoolean("Vision/Available", visionEnabled && anyConnected);
-        SmartDashboard.putBoolean("Vision/AnyTargetsVisible", anyTargetsVisible);
-
-        // Log best/closest target info (rate-limited)
-        if (logDetailedData) {
-            if (bestTarget != null) {
-                SmartDashboard.putNumber("Vision/BestTarget/TagID", bestTarget.getFiducialId());
-                SmartDashboard.putNumber("Vision/BestTarget/Ambiguity", bestAmbiguity);
-                SmartDashboard.putBoolean("Vision/BestTarget/AmbiguityOK", bestAmbiguity <= VisionConstants.kMaxAmbiguity);
-                SmartDashboard.putString("Vision/BestTarget/Camera", bestCameraName);
-            } else {
-                SmartDashboard.putNumber("Vision/BestTarget/TagID", -1);
-                SmartDashboard.putNumber("Vision/BestTarget/Ambiguity", 0);
-                SmartDashboard.putBoolean("Vision/BestTarget/AmbiguityOK", false);
-                SmartDashboard.putString("Vision/BestTarget/Camera", "None");
-            }
-
-            if (closestTarget != null) {
-                SmartDashboard.putNumber("Vision/ClosestTarget/TagID", closestTarget.getFiducialId());
-                SmartDashboard.putNumber("Vision/ClosestTarget/Distance", closestDistance);
-                SmartDashboard.putBoolean("Vision/ClosestTarget/InRange", closestDistance <= VisionConstants.kMaxVisionDistanceMeters);
-                SmartDashboard.putString("Vision/ClosestTarget/Camera", closestCameraName);
-            } else {
-                SmartDashboard.putNumber("Vision/ClosestTarget/TagID", -1);
-                SmartDashboard.putNumber("Vision/ClosestTarget/Distance", 0);
-                SmartDashboard.putBoolean("Vision/ClosestTarget/InRange", false);
-                SmartDashboard.putString("Vision/ClosestTarget/Camera", "None");
-            }
-        }
-
-        // AdvantageKit logging (always, for replay)
-        Logger.recordOutput("Vision/Available", visionEnabled && anyConnected);
-        Logger.recordOutput("Vision/AnyTargetsVisible", anyTargetsVisible);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

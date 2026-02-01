@@ -14,6 +14,7 @@ import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.commands.UtilityCommands;
 import frc.robot.constants.VisionConstants;
 import frc.robot.subsystems.DriveSubsystem;
@@ -275,25 +276,26 @@ public class DashboardSetup {
   }
 
   private void checkPitCommands() {
+    CommandScheduler scheduler = CommandScheduler.getInstance();
     if (pitSetWheelsStraight.getBoolean(false)) {
       pitSetWheelsStraight.setBoolean(false);
-      UtilityCommands.setStraightAhead(driveSubsystem).schedule();
+      scheduler.schedule(UtilityCommands.setStraightAhead(driveSubsystem));
     }
     if (pitZeroHeading.getBoolean(false)) {
       pitZeroHeading.setBoolean(false);
-      UtilityCommands.zeroHeading(driveSubsystem).schedule();
+      scheduler.schedule(UtilityCommands.zeroHeading(driveSubsystem));
     }
     if (pitCoastMode.getBoolean(false)) {
       pitCoastMode.setBoolean(false);
-      UtilityCommands.setCoastMode(driveSubsystem).schedule();
+      scheduler.schedule(UtilityCommands.setCoastMode(driveSubsystem));
     }
     if (pitBrakeMode.getBoolean(false)) {
       pitBrakeMode.setBoolean(false);
-      UtilityCommands.setBrakeMode(driveSubsystem).schedule();
+      scheduler.schedule(UtilityCommands.setBrakeMode(driveSubsystem));
     }
     if (pitVisionReset.getBoolean(false)) {
       pitVisionReset.setBoolean(false);
-      UtilityCommands.forceVisionReset(driveSubsystem).schedule();
+      scheduler.schedule(UtilityCommands.forceVisionReset(driveSubsystem));
     }
   }
 

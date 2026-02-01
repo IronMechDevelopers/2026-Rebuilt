@@ -13,6 +13,7 @@ import com.studica.frc.AHRS;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
@@ -26,7 +27,6 @@ import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.constants.DriveConstants;
 import frc.robot.constants.FieldConstants;
@@ -136,117 +136,60 @@ public class DriveSubsystem extends SubsystemBase {
 
     private void updateDashboard() {
         // ═══════════════════════════════════════════════════════════════════════
-        // POSE COMPARISON LOGGING - For AdvantageScope calibration & debugging
+        // ADVANTAGEKIT LOGGING - Primary telemetry for AdvantageScope replay
         // ═══════════════════════════════════════════════════════════════════════
         //
-        // ADVANTAGESCOPE SETUP:
+        // All data logged here is available in AdvantageScope for post-match analysis.
+        // NT4Publisher streams this to NetworkTables for live viewing.
+        //
+        // ADVANTAGESCOPE POSE SETUP:
         //   1. Open AdvantageScope, connect to robot or load log file
         //   2. Add a "2D Field" or "3D Field" view
-        //   3. Drag these onto the field (all under "Poses/" folder):
-        //      - Poses/Fused        (GOLD)   - What the robot "believes" (vision + odometry combined)
-        //      - Poses/OdometryOnly (BLUE)   - Raw wheel encoder math, drifts over time
-        //      - Poses/Vision       (GREEN)  - What AprilTags see, only updates when tags visible
-        //      - Poses/VisibleTags  (RED)    - Field positions of AprilTags currently being detected
+        //   3. Drag these onto the field:
+        //      - Odometry/Robot (GOLD) - Fused pose (what robot believes)
+        //      - Odometry/OdometryOnly (BLUE) - Encoder-only, drifts over time
+        //      - Vision/RobotPose (GREEN) - Latest vision estimate
         //
-        // VISION RAYS SETUP (shows line from robot to each detected tag):
-        //   4. Drag Poses/VisionRays/0, /1, /2, /3 onto the field
-        //   5. For each ray: click the colored icon -> change type to "Trajectory"
-        //   6. You'll see lines from the robot to each AprilTag it's detecting!
-        //
-        // WHAT TO LOOK FOR:
-        //   - All three robot poses should start at same position after "Snap to Vision"
-        //   - OdometryOnly will drift as you drive (wheel slip, encoder error)
-        //   - Fused should track closer to Vision when tags are visible
-        //   - If Fused diverges wildly from Vision, check camera calibration
-        //   - VisibleTags shows which tags the robot is detecting (verify correct tags!)
-        //   - VisionRays show exactly which tags are being used for pose estimation
-        //
-        // CALIBRATION WORKFLOW:
-        //   1. Point robot at AprilTag
-        //   2. Press "Snap to Vision" on Vision Cal tab
-        //   3. All three poses should align
-        //   4. Drive around and watch them diverge/converge
-        //   5. Check VisionRays to see which AprilTags are being tracked
-        //
-        Logger.recordOutput("Poses/Fused", getCurrentPose());
-        Logger.recordOutput("Poses/OdometryOnly", odometry.getPoseMeters());
-        Logger.recordOutput("Poses/Vision", latestVisionPose);
-        Logger.recordOutput("Poses/VisibleTags", vision.getVisibleTagPoses());
-
-        // Log vision rays (lines from robot to each visible tag)
-        // In AdvantageScope, set these to "Trajectory" type to see the rays
-        Pose2d[] visibleTags = vision.getVisibleTagPoses();
-        Pose2d robotPose = getCurrentPose();
-        for (int i = 0; i < visibleTags.length && i < 4; i++) {
-            Logger.recordOutput("Poses/VisionRays/" + i, new Pose2d[] { robotPose, visibleTags[i] });
-        }
-        // Clear unused ray slots (so old rays don't persist)
-        for (int i = visibleTags.length; i < 4; i++) {
-            Logger.recordOutput("Poses/VisionRays/" + i, new Pose2d[] {});
-        }
-
-        // Legacy paths (for backwards compatibility with existing dashboards)
-        Logger.recordOutput("Drive/Pose", getCurrentPose());
-        Logger.recordOutput("Drive/OdometryPose", odometry.getPoseMeters());
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // OTHER DRIVE TELEMETRY
         // ═══════════════════════════════════════════════════════════════════════
 
-        // Log Module States (measured)
+        // --- POSE DATA (Primary for AdvantageScope 2D/3D Field) ---
+        Logger.recordOutput("Odometry/Robot", getCurrentPose());
+        Logger.recordOutput("Odometry/OdometryOnly", odometry.getPoseMeters());
+        Logger.recordOutput("Odometry/VisionPose", latestVisionPose);
+
+        // --- APRILTAG TRACKING (3D poses for field visualization) ---
+        // AcceptedTags: Tags that passed filtering and were used for localization
+        // RejectedTags: Tags detected but filtered out (ambiguity, distance, etc.)
+        Logger.recordOutput("Odometry/AcceptedTags", vision.getAcceptedTagPoses());
+        Logger.recordOutput("Odometry/RejectedTags", vision.getRejectedTagPoses());
+
+        // --- MODULE STATES (For swerve visualization) ---
         Logger.recordOutput("Drive/MeasuredStates", new SwerveModuleState[] {
             frontLeft.getState(), frontRight.getState(), rearLeft.getState(), rearRight.getState()
         });
 
-        // Log Velocities (measured)
+        // --- CHASSIS SPEEDS (For tuning/analysis) ---
         ChassisSpeeds speeds = getRobotRelativeSpeeds();
-        Logger.recordOutput("Drive/MeasuredSpeeds/vx", speeds.vxMetersPerSecond);
-        Logger.recordOutput("Drive/MeasuredSpeeds/vy", speeds.vyMetersPerSecond);
-        Logger.recordOutput("Drive/MeasuredSpeeds/omega", speeds.omegaRadiansPerSecond);
-        Logger.recordOutput("Drive/Heading", getHeading());
+        Logger.recordOutput("Drive/MeasuredSpeeds", speeds);
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // GYRO DATA - Critical for odometry debugging
-        // ═══════════════════════════════════════════════════════════════════════
-        //
-        // Use this to debug odometry drift:
-        //   - If GyroConnected is false, odometry will be wrong
-        //   - Compare GyroAngle to Poses/Fused heading to check calibration
-        //   - High GyroRate during vision updates may cause rejection
-        //
+        // --- GYRO (For odometry debugging) ---
         Logger.recordOutput("Gyro/Connected", gyro.isConnected());
-        Logger.recordOutput("Gyro/AngleDeg", gyro.getAngle());
         Logger.recordOutput("Gyro/YawDeg", gyro.getYaw());
-        Logger.recordOutput("Gyro/PitchDeg", gyro.getPitch());
-        Logger.recordOutput("Gyro/RollDeg", gyro.getRoll());
         Logger.recordOutput("Gyro/RateDegPerSec", Math.toDegrees(gyro.getRate()));
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // HUB DISTANCE - Always logged so drivers know when to spin up shooter
-        // ═══════════════════════════════════════════════════════════════════════
+        // --- HUB DISTANCE (For shooter ranging) ---
         var hubCenter = FieldConstants.getAllianceHubCenter();
         double distanceToHubMeters = getCurrentPose().getTranslation().getDistance(hubCenter);
-        double distanceToHubInches = Units.metersToInches(distanceToHubMeters);
-
-        // Check if in shooting range
         boolean inShootingRange = distanceToHubMeters >= FieldConstants.kMinShootingDistance
                                && distanceToHubMeters <= FieldConstants.kMaxShootingDistance;
 
-        // Log to SmartDashboard (for Shuffleboard display)
-        SmartDashboard.putNumber("Hub/DistanceInches", distanceToHubInches);
-        SmartDashboard.putBoolean("Hub/InRange", inShootingRange);
-
-        // Log to AdvantageKit (for replay/analysis)
-        Logger.recordOutput("Hub/DistanceInches", distanceToHubInches);
         Logger.recordOutput("Hub/DistanceMeters", distanceToHubMeters);
         Logger.recordOutput("Hub/InRange", inShootingRange);
 
-        // Driver Feedback
-        SmartDashboard.putBoolean("Drive/FieldRelative", fieldRelative);
-        SmartDashboard.putNumber("Drive/SpeedMultiplier", speedMultiplier);
-        Logger.recordOutput("Drive/BatteryVoltage", RobotController.getBatteryVoltage());
+        // --- DRIVER SETTINGS ---
         Logger.recordOutput("Drive/FieldRelative", fieldRelative);
         Logger.recordOutput("Drive/SpeedMultiplier", speedMultiplier);
+        Logger.recordOutput("Drive/BatteryVoltage", RobotController.getBatteryVoltage());
     }
 
     /**
@@ -358,41 +301,132 @@ public class DriveSubsystem extends SubsystemBase {
         return poseEstimator.getEstimatedPosition();
     }
 
-    /** Resets the pose estimator, odometry, and vision reference to a known location. */
+    // ═══════════════════════════════════════════════════════════════════════════
+    // POSE RESET METHODS
+    // ═══════════════════════════════════════════════════════════════════════════
+    //
+    // All resets sync the three pose trackers (fused, odometry, vision) so they
+    // agree in AdvantageScope. Use the appropriate method for your situation:
+    //
+    //   zeroHeading()      - Robot is facing "forward" (away from alliance wall)
+    //   setHeading(angle)  - Robot is facing a known angle on the field
+    //   forceVisionReset() - Trust AprilTags completely, snap to vision
+    //   resetPose(pose)    - Robot is at a known field position
+    //   resetToOrigin()    - Testing/calibration at (0,0,0)
+    //
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Resets all pose tracking to a known field position.
+     * Does NOT reset the gyro - use this when you know where the robot is
+     * but don't want to change the gyro reference.
+     *
+     * @param pose The known field position
+     */
     public void resetPose(Pose2d pose) {
-        poseEstimator.resetPosition(getRotation2d(), getModulePositions(), pose);
-        odometry.resetPosition(getRotation2d(), getModulePositions(), pose);
-        latestVisionPose = pose;  // Sync all three poses for AdvantageScope comparison
+        Rotation2d gyroAngle = getRotation2d();
+        poseEstimator.resetPosition(gyroAngle, getModulePositions(), pose);
+        odometry.resetPosition(gyroAngle, getModulePositions(), pose);
+        latestVisionPose = pose;
+
+        Logger.recordOutput("Drive/Reset/Pose", pose);
+        Logger.recordOutput("Drive/Reset/Type", "POSE");
+        Logger.recordOutput("Drive/Reset/Timestamp", Timer.getFPGATimestamp());
     }
 
     /**
-     * Attempts to snap the robot pose to the current vision estimate.
-     * @return true if a tag was visible and reset occurred.
+     * Snaps all pose tracking to the current vision estimate.
+     * Use this when you trust AprilTags more than odometry (e.g., after driving blind).
+     * Does NOT reset the gyro.
+     *
+     * @return true if successful, false if no AprilTags visible
      */
     public boolean forceVisionReset() {
         var visionEstimates = vision.getEstimatedGlobalPoses(getCurrentPose());
-        if (!visionEstimates.isEmpty()) {
-            Pose2d visionPose = visionEstimates.get(0).estimatedPose.toPose2d();
-            resetPose(visionPose);
-            Logger.recordOutput("Drive/VisionResetPose", visionPose);
-            Logger.recordOutput("Drive/VisionResetTimestamp", Timer.getFPGATimestamp());
-            SmartDashboard.putBoolean("Vision/ResetSucceeded", true);
-            SmartDashboard.putString("Vision/LastResetStatus",
-                String.format("Reset to (%.2f, %.2f, %.1f°)",
-                    visionPose.getX(), visionPose.getY(), visionPose.getRotation().getDegrees()));
-            return true;
+        if (visionEstimates.isEmpty()) {
+            Logger.recordOutput("Drive/Reset/Type", "VISION_FAILED");
+            Logger.recordOutput("Drive/Reset/Timestamp", Timer.getFPGATimestamp());
+            DriverStation.reportWarning("Vision reset failed - no AprilTags visible!", false);
+            return false;
         }
-        SmartDashboard.putBoolean("Vision/ResetSucceeded", false);
-        SmartDashboard.putString("Vision/LastResetStatus", "FAILED - No tags visible!");
-        return false;
+
+        Pose2d visionPose = visionEstimates.get(0).estimatedPose.toPose2d();
+        int tagCount = visionEstimates.get(0).targetsUsed.size();
+
+        Rotation2d gyroAngle = getRotation2d();
+        poseEstimator.resetPosition(gyroAngle, getModulePositions(), visionPose);
+        odometry.resetPosition(gyroAngle, getModulePositions(), visionPose);
+        latestVisionPose = visionPose;
+
+        Logger.recordOutput("Drive/Reset/Pose", visionPose);
+        Logger.recordOutput("Drive/Reset/Type", "VISION");
+        Logger.recordOutput("Drive/Reset/TagCount", tagCount);
+        Logger.recordOutput("Drive/Reset/Timestamp", Timer.getFPGATimestamp());
+
+        System.out.println(String.format("Vision reset: (%.2f, %.2f, %.1f°) using %d tag(s)",
+            visionPose.getX(), visionPose.getY(), visionPose.getRotation().getDegrees(), tagCount));
+        return true;
     }
 
     /**
-     * Resets odometry to the origin (0, 0) with 0 heading.
-     * Use this for calibration or when starting from a known location.
+     * Zeros the gyro and sets heading to 0 degrees.
+     * Call this when the robot is facing "forward" (away from your alliance wall).
+     * Preserves the current X/Y position.
+     */
+    public void zeroHeading() {
+        setHeading(new Rotation2d()); // 0 degrees
+    }
+
+    /**
+     * Sets the robot heading to a specific angle.
+     * Call this when the robot is facing a known direction on the field.
+     * Preserves the current X/Y position.
+     *
+     * <p>Note: This resets the gyro and uses the pose estimator's internal
+     * offset tracking to handle the heading. The gyro will read 0 after this,
+     * but the pose will have the correct heading.
+     *
+     * @param heading The field-relative heading (0 = away from alliance wall)
+     */
+    public void setHeading(Rotation2d heading) {
+        gyro.reset(); // Gyro now reads 0
+
+        // Update all poses with new heading, keep X/Y
+        Pose2d currentPose = getCurrentPose();
+        Pose2d newPose = new Pose2d(currentPose.getTranslation(), heading);
+
+        // Tell the estimators: "gyro reads 0, but we want heading to be X"
+        // They will internally track the offset
+        Rotation2d gyroAngle = new Rotation2d(); // 0 after reset
+        poseEstimator.resetPosition(gyroAngle, getModulePositions(), newPose);
+        odometry.resetPosition(gyroAngle, getModulePositions(), newPose);
+        latestVisionPose = new Pose2d(latestVisionPose.getTranslation(), heading);
+
+        Logger.recordOutput("Drive/Reset/Pose", newPose);
+        Logger.recordOutput("Drive/Reset/Type", "HEADING");
+        Logger.recordOutput("Drive/Reset/Heading", heading.getDegrees());
+        Logger.recordOutput("Drive/Reset/Timestamp", Timer.getFPGATimestamp());
+
+        System.out.println(String.format("Heading reset to %.1f°", heading.getDegrees()));
+    }
+
+    /**
+     * Resets everything to origin (0, 0) with 0 heading.
+     * Also zeros the gyro. Use for testing/calibration.
      */
     public void resetToOrigin() {
-        resetPose(new Pose2d());
+        gyro.reset();
+        Pose2d origin = new Pose2d();
+
+        poseEstimator.resetPosition(new Rotation2d(), getModulePositions(), origin);
+        odometry.resetPosition(new Rotation2d(), getModulePositions(), origin);
+        latestVisionPose = origin;
+
+        Logger.recordOutput("Drive/Reset/Pose", origin);
+        Logger.recordOutput("Drive/Reset/Type", "ORIGIN");
+        Logger.recordOutput("Drive/Reset/Timestamp", Timer.getFPGATimestamp());
+
+        System.out.println("Reset to origin (0, 0, 0°)");
     }
 
     /**
@@ -425,13 +459,6 @@ public class DriveSubsystem extends SubsystemBase {
         return Math.toDegrees(gyro.getRate());
     }
 
-    /** Resets the gyro to 0 heading. Preserves X/Y position. */
-    public void zeroHeading() {
-        gyro.reset();
-        Pose2d current = getCurrentPose();
-        resetPose(new Pose2d(current.getTranslation(), new Rotation2d()));
-    }
-    
     /** Calculates straight-line distance to a target pose. */
     public double getDistanceToTarget(Pose2d target) {
         return getCurrentPose().getTranslation().getDistance(target.getTranslation());
@@ -457,7 +484,6 @@ public class DriveSubsystem extends SubsystemBase {
      */
     public void setSpeedMultiplier(double multiplier) {
         speedMultiplier = edu.wpi.first.math.MathUtil.clamp(multiplier, 0.0, 1.0);
-        SmartDashboard.putNumber("Drive/SpeedMultiplier", speedMultiplier);
     }
 
     public double getSpeedMultiplier() {
@@ -466,7 +492,6 @@ public class DriveSubsystem extends SubsystemBase {
 
     public void setFieldRelative(boolean fieldRelative) {
         this.fieldRelative = fieldRelative;
-        SmartDashboard.putBoolean("Drive/FieldRelative", this.fieldRelative);
     }
 
     public boolean getFieldRelative() {

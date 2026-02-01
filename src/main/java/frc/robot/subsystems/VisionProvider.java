@@ -6,6 +6,7 @@ import org.photonvision.EstimatedRobotPose;
 
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 
@@ -85,5 +86,40 @@ public interface VisionProvider {
      */
     default Pose2d[] getVisibleTagPoses() {
         return new Pose2d[0];
+    }
+
+    /**
+     * Get the 3D field positions of AprilTags whose poses were ACCEPTED for localization.
+     *
+     * <p>These are tags that passed all filtering criteria (ambiguity, distance, etc.)
+     * and were used to update the robot's pose estimate. Use Pose3d since AprilTags
+     * can be mounted at various heights on the field.
+     *
+     * <p>Useful for AdvantageScope visualization to see which tags are actively
+     * contributing to pose estimation.
+     *
+     * @return Array of Pose3d for accepted tag field positions. Empty if none accepted.
+     */
+    default Pose3d[] getAcceptedTagPoses() {
+        return new Pose3d[0];
+    }
+
+    /**
+     * Get the 3D field positions of AprilTags whose poses were REJECTED.
+     *
+     * <p>These are tags that were detected but filtered out due to:
+     * <ul>
+     *   <li>High ambiguity (pose solution uncertain)</li>
+     *   <li>Too far away (unreliable at distance)</li>
+     *   <li>Single tag with large correction (safety filter)</li>
+     * </ul>
+     *
+     * <p>Useful for AdvantageScope visualization to debug why certain tags
+     * aren't being used for localization.
+     *
+     * @return Array of Pose3d for rejected tag field positions. Empty if none rejected.
+     */
+    default Pose3d[] getRejectedTagPoses() {
+        return new Pose3d[0];
     }
 }
