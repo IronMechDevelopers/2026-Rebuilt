@@ -138,11 +138,11 @@ public class ButtonBindings {
 
     // Left trigger: Intake (hold)
     driver.leftTrigger()
-        .whileTrue(ballSubsystem.runEnd(() -> ballSubsystem.intake(), () -> ballSubsystem.stop()));
+        .whileTrue(ballSubsystem.intakeCommand().finallyDo(() -> ballSubsystem.stop()));
 
     // Left bumper: Eject (hold)
     driver.leftBumper()
-        .whileTrue(ballSubsystem.runEnd(() -> ballSubsystem.eject(), () -> ballSubsystem.stop()));
+        .whileTrue(ballSubsystem.ejectCommand().finallyDo(() -> ballSubsystem.stop()));
 
     // Right trigger: Shoot (hold - spin up for 1s then launch)
     driver.rightTrigger()
@@ -183,11 +183,11 @@ public class ButtonBindings {
   private void configureCoDriverBindings() {
     // X button: Intake (hold)
     coDriver.x()
-        .whileTrue(ballSubsystem.runEnd(() -> ballSubsystem.intake(), () -> ballSubsystem.stop()));
+        .whileTrue(ballSubsystem.intakeCommand().finallyDo(() -> ballSubsystem.stop()));
 
     // B button: Eject (hold)
     coDriver.b()
-        .whileTrue(ballSubsystem.runEnd(() -> ballSubsystem.eject(), () -> ballSubsystem.stop()));
+        .whileTrue(ballSubsystem.ejectCommand().finallyDo(() -> ballSubsystem.stop()));
 
     // A button: Shoot (hold - spin up for 1s then launch)
     coDriver.a()

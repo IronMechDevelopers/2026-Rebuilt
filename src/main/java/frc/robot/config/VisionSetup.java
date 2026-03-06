@@ -78,16 +78,25 @@ public class VisionSetup {
         return new SimVisionProvider(fieldLayout);
       }
 
+      // TODO: VISION DISABLED FOR FIRST COMP - Re-enable for next competition
+      // Vision cameras were not ready in time. All code remains in place.
+      // To re-enable: Remove this block and uncomment the vision subsystem creation below.
+      DriverStation.reportWarning(
+        "Vision temporarily disabled - using NoVisionProvider",
+        false
+      );
+      return new NoVisionProvider();
+
       // Step 3: Real robot - Create camera configurations for front and back cameras
-      Transform3d frontCameraTransform = createFrontCameraTransform();
-      Transform3d backCameraTransform = createBackCameraTransform();
+      // Transform3d frontCameraTransform = createFrontCameraTransform();
+      // Transform3d backCameraTransform = createBackCameraTransform();
 
       // Step 4: Create VisionSubsystem with BOTH cameras
-      return new VisionSubsystem(
-        fieldLayout,
-        new VisionSubsystem.CameraConfig(VisionConstants.kFrontCameraName, frontCameraTransform),
-        new VisionSubsystem.CameraConfig(VisionConstants.kBackCameraName, backCameraTransform)
-      );
+      // return new VisionSubsystem(
+      //   fieldLayout,
+      //   new VisionSubsystem.CameraConfig(VisionConstants.kFrontCameraName, frontCameraTransform),
+      //   new VisionSubsystem.CameraConfig(VisionConstants.kBackCameraName, backCameraTransform)
+      // );
 
     } catch (Exception e) {
       DriverStation.reportError(

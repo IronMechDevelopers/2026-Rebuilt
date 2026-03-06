@@ -468,8 +468,6 @@ public class DriveSubsystem extends SubsystemBase {
         Logger.recordOutput("Drive/Reset/TagCount", tagCount);
         Logger.recordOutput("Drive/Reset/Timestamp", Timer.getFPGATimestamp());
 
-        System.out.println(String.format("Vision reset: (%.2f, %.2f, %.1f°) using %d tag(s)",
-            visionPose.getX(), visionPose.getY(), visionPose.getRotation().getDegrees(), tagCount));
         return true;
     }
 
@@ -479,7 +477,6 @@ public class DriveSubsystem extends SubsystemBase {
      * Preserves the current X/Y position.
      */
     public void zeroHeading() {
-        System.out.println("Zero HEADING");
         setHeading(new Rotation2d()); // 0 degrees
     }
 
@@ -512,8 +509,6 @@ public class DriveSubsystem extends SubsystemBase {
         Logger.recordOutput("Drive/Reset/Type", "HEADING");
         Logger.recordOutput("Drive/Reset/Heading", heading.getDegrees());
         Logger.recordOutput("Drive/Reset/Timestamp", Timer.getFPGATimestamp());
-
-        System.out.println(String.format("Heading reset to %.1f°", heading.getDegrees()));
     }
 
     /**
@@ -537,8 +532,6 @@ public class DriveSubsystem extends SubsystemBase {
         Logger.recordOutput("Drive/Reset/Pose", origin);
         Logger.recordOutput("Drive/Reset/Type", "ORIGIN");
         Logger.recordOutput("Drive/Reset/Timestamp", Timer.getFPGATimestamp());
-
-        System.out.println("Reset to origin (0, 0, 0°)");
     }
 
     /**
@@ -565,10 +558,6 @@ public class DriveSubsystem extends SubsystemBase {
         }
 
         resetPose(startPose);
-
-        System.out.println(String.format("Auto start position: (%.2f, %.2f, %.0f°) - %s alliance",
-            startPose.getX(), startPose.getY(), startPose.getRotation().getDegrees(),
-            alliance.isPresent() ? alliance.get().toString() : "Blue"));
     }
 
     /**

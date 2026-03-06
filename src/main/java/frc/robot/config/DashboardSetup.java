@@ -106,18 +106,14 @@ public class DashboardSetup {
    * Configures all dashboard tabs.
    */
   public void configureAll() {
-    System.out.println("DashboardSetup: Starting configuration...");
-
     try {
       configureMatchTab();
-      System.out.println("DashboardSetup: Match tab configured");
     } catch (Exception e) {
       DriverStation.reportError("DashboardSetup: Match tab failed: " + e.getMessage(), e.getStackTrace());
     }
 
     try {
       configurePitTab();
-      System.out.println("DashboardSetup: Pit tab configured");
     } catch (Exception e) {
       DriverStation.reportError("DashboardSetup: Pit tab failed: " + e.getMessage(), e.getStackTrace());
     }
@@ -129,9 +125,6 @@ public class DashboardSetup {
 
     // Set Match tab as the default view
     Shuffleboard.selectTab("Match");
-
-    System.out.println("DashboardSetup: All tabs configured successfully!");
-    System.out.println("DashboardSetup: Match tab set as default");
   }
 
   private void configureMatchTab() {
@@ -283,26 +276,22 @@ public class DashboardSetup {
       scheduler.schedule(fuelSubsystem.runOnce(() -> fuelSubsystem.intake())
           .withTimeout(2.0)
           .andThen(() -> fuelSubsystem.stop()));
-      System.out.println("Pit: Testing intake (2 seconds)");
     }
     if (pitTestEject.getBoolean(false)) {
       pitTestEject.setBoolean(false);
       scheduler.schedule(fuelSubsystem.runOnce(() -> fuelSubsystem.eject())
           .withTimeout(2.0)
           .andThen(() -> fuelSubsystem.stop()));
-      System.out.println("Pit: Testing eject (2 seconds)");
     }
     if (pitTestLaunch.getBoolean(false)) {
       pitTestLaunch.setBoolean(false);
       scheduler.schedule(fuelSubsystem.runOnce(() -> fuelSubsystem.launch())
           .withTimeout(2.0)
           .andThen(() -> fuelSubsystem.stop()));
-      System.out.println("Pit: Testing launch (2 seconds)");
     }
     if (pitStopFuel.getBoolean(false)) {
       pitStopFuel.setBoolean(false);
       fuelSubsystem.stop();
-      System.out.println("Pit: Stopped fuel subsystem");
     }
   }
 

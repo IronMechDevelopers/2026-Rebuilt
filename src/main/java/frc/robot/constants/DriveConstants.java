@@ -67,7 +67,7 @@ public final class DriveConstants {
   // =====================================================================══
 
   /** Brownout voltage threshold (volts). Logs warning when battery drops below this. */
-  public static final double kBrownoutVoltageThreshold = 6.5;
+  public static final double kBrownoutVoltageThreshold = 8.0;
 
   /** Max angular velocity to accept vision (deg/sec). Reject if spinning too fast (motion blur). */
   public static final double kMaxAngularVelocityForVisionDegPerSec = 720.0;

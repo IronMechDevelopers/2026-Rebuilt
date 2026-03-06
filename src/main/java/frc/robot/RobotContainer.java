@@ -119,7 +119,7 @@ public class RobotContainer {
     // =====================================================================
     // STEP 1: Register PathPlanner named commands (MUST be first!)
     // =====================================================================
-    AutoSelector.registerNamedCommands();
+    AutoSelector.registerNamedCommands(ballSubsystem);
 
     // =====================================================================
     // STEP 2: Create auto selector

@@ -19,7 +19,7 @@ package frc.robot.constants;
 
     // LAUNCHING operation
     public static final double LAUNCHING_INDEXER_VOLTAGE = 9;
-    public static final double LAUNCHING_MAIN_ROLLER_VOLTAGE = 12;
+    public static final double LAUNCHING_MAIN_ROLLER_VOLTAGE = 11.5;
 
     // SPIN_UP operation
     public static final double SPIN_UP_INDEXER_VOLTAGE = -6;
@@ -27,5 +27,5 @@ package frc.robot.constants;
 
     // EJECT operation
     public static final double EJECT_INDEXER_VOLTAGE = 9;
-    public static final double EJECT_MAIN_ROLLER_VOLTAGE = -12;
+    public static final double EJECT_MAIN_ROLLER_VOLTAGE = -11.5;
   }

@@ -103,6 +103,18 @@ public class CANFuelSubsystem extends SubsystemBase {
     return this.run(() -> launch());
   }
 
+  // A command factory to turn the intake method into a command that requires this
+  // subsystem
+  public Command intakeCommand() {
+    return this.run(() -> intake());
+  }
+
+  // A command factory to turn the eject method into a command that requires this
+  // subsystem
+  public Command ejectCommand() {
+    return this.run(() -> eject());
+  }
+
   @Override
   public void periodic() {
     // Log motor states for debugging fuel handling issues

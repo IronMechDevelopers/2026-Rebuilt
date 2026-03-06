@@ -264,10 +264,6 @@ public class MatchStateTracker extends SubsystemBase {
             if (code == MatchConstants.kRedInactiveCode || code == MatchConstants.kBlueInactiveCode) {
                 fmsInactiveCode = code;
                 fmsDataReceived = true;
-
-                // Log which alliance is inactive first
-                String inactiveFirst = (code == MatchConstants.kRedInactiveCode) ? "RED" : "BLUE";
-                System.out.println("FMS DATA RECEIVED: " + inactiveFirst + " hub inactive in Shifts 1 & 3");
             }
         }
     }
@@ -516,7 +512,6 @@ public class MatchStateTracker extends SubsystemBase {
             SmartDashboard.putBoolean("Practice/Restart", false);
             if (practiceMode) {
                 practiceStartTime = Timer.getFPGATimestamp();
-                System.out.println("PRACTICE MODE: Restarted");
             }
         }
 
@@ -535,9 +530,6 @@ public class MatchStateTracker extends SubsystemBase {
         practiceMode = true;
         practiceStartTime = Timer.getFPGATimestamp();
         SmartDashboard.putBoolean("Practice/Enabled", true);
-        System.out.println("PRACTICE MODE: Started - Get ready for shift timing practice!");
-        System.out.println("PRACTICE MODE: We are " +
-            (practiceWeAreInactiveFirst ? "INACTIVE" : "ACTIVE") + " first");
     }
 
     /**
@@ -546,7 +538,6 @@ public class MatchStateTracker extends SubsystemBase {
     public void stopPracticeMode() {
         practiceMode = false;
         SmartDashboard.putBoolean("Practice/Enabled", false);
-        System.out.println("PRACTICE MODE: Stopped");
 
         // Reset to pre-match state
         currentPhase = MatchPhase.PRE_MATCH;
@@ -636,7 +627,6 @@ public class MatchStateTracker extends SubsystemBase {
         if (code == MatchConstants.kRedInactiveCode || code == MatchConstants.kBlueInactiveCode) {
             fmsInactiveCode = code;
             fmsDataReceived = true;
-            System.out.println("TEST: FMS data manually set to '" + code + "'");
         }
     }
 
