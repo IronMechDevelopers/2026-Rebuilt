@@ -542,6 +542,36 @@ public class DriveSubsystem extends SubsystemBase {
     }
 
     /**
+     * Resets pose to starting position in front of alliance hub.
+     * Call this at the start of autonomous to set the known starting position.
+     *
+     * Starting positions are at optimal shooting distance from the hub:
+     * - Blue alliance: In front of blue hub, facing forward (0°)
+     * - Red alliance: In front of red hub, facing backward (180°)
+     */
+    public void resetToAllianceHubStart() {
+        Translation2d hubCenter = FieldConstants.getAllianceHubCenter();
+        var alliance = DriverStation.getAlliance();
+
+        Pose2d startPose;
+        if (alliance.isPresent() && alliance.get() == Alliance.Red) {
+            // Red alliance: Start in front of red hub (toward red alliance wall)
+            double startX = hubCenter.getX() + FieldConstants.kOptimalShootingDistance;
+            startPose = new Pose2d(startX, hubCenter.getY(), Rotation2d.fromDegrees(180));
+        } else {
+            // Blue alliance: Start in front of blue hub (toward blue alliance wall)
+            double startX = hubCenter.getX() - FieldConstants.kOptimalShootingDistance;
+            startPose = new Pose2d(startX, hubCenter.getY(), Rotation2d.fromDegrees(0));
+        }
+
+        resetPose(startPose);
+
+        System.out.println(String.format("Auto start position: (%.2f, %.2f, %.0f°) - %s alliance",
+            startPose.getX(), startPose.getY(), startPose.getRotation().getDegrees(),
+            alliance.isPresent() ? alliance.get().toString() : "Blue"));
+    }
+
+    /**
      * Returns true if vision is working and can be trusted.
      *
      * <p><b>Use this before running vision-dependent commands!</b>

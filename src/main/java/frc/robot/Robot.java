@@ -89,6 +89,9 @@ public class Robot extends LoggedRobot {
   /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
   @Override
   public void autonomousInit() {
+    // Set starting position in front of our alliance hub
+    robotContainer.getDriveSubsystem().resetToAllianceHubStart();
+
     autonomousCommand = robotContainer.getAutonomousCommand();
 
     // schedule the autonomous command (example)

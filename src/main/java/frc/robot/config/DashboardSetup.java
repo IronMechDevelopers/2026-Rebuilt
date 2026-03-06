@@ -17,26 +17,26 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.commands.UtilityCommands;
 import frc.robot.constants.VisionConstants;
+import frc.robot.subsystems.CANFuelSubsystem;
 import frc.robot.subsystems.DriveSubsystem;
 import frc.robot.subsystems.MatchStateTracker;
 import frc.robot.subsystems.MatchStateTracker.HubStatus;
 import frc.robot.subsystems.MatchStateTracker.WarningLevel;
 
 /**
- * Configures Shuffleboard tabs and widgets following the 4-dashboard structure.
+ * Configures Shuffleboard tabs and widgets for competition and pit use.
  *
  * <h2>TABS</h2>
  * <ul>
- *   <li><b>Match</b> - Drive team during competition</li>
- *   <li><b>Pit</b> - Pit crew between matches</li>
- *   <li><b>Vision</b> - Vision tuning</li>
- *   <li><b>Software</b> - Programmers</li>
+ *   <li><b>Match</b> - Drive team during competition (shift awareness, field position, warnings)</li>
+ *   <li><b>Pit</b> - Pit crew between matches (system checks, subsystem testing, setup controls)</li>
  * </ul>
  */
 public class DashboardSetup {
 
   private final DriveSubsystem driveSubsystem;
   private final MatchStateTracker matchStateTracker;
+  private final CANFuelSubsystem fuelSubsystem;
   private final SendableChooser<Command> autoChooser;
 
   // Camera keys
@@ -62,40 +62,26 @@ public class DashboardSetup {
   private GenericEntry matchInRange;
 
   // =====================================================================══════
-  // PIT TAB
+  // PIT TAB - For pit crew between matches
   // =====================================================================══════
   private GenericEntry pitBattery;
   private GenericEntry pitBatteryStatus;
   private GenericEntry pitVisionHealthy;
   private GenericEntry pitCameraCount;
   private GenericEntry pitCanUtil;
+
+  // Drive system controls
   private GenericEntry pitSetWheelsStraight;
   private GenericEntry pitZeroHeading;
   private GenericEntry pitCoastMode;
   private GenericEntry pitBrakeMode;
   private GenericEntry pitVisionReset;
 
-  // =====================================================================══════
-  // VISION TAB
-  // =====================================================================══════
-  private GenericEntry visionHealthy;
-  private GenericEntry visionEnabled;
-  private GenericEntry visionTotalTags;
-  private GenericEntry visionAccepted;
-  private GenericEntry visionRejected;
-  private GenericEntry visionFrontConnected;
-  private GenericEntry visionFrontTargets;
-  private GenericEntry visionBackConnected;
-  private GenericEntry visionBackTargets;
-
-  // =====================================================================══════
-  // SOFTWARE TAB
-  // =====================================================================══════
-  private GenericEntry softwareBattery;
-  private GenericEntry softwareBrownout;
-  private GenericEntry softwareCanUtil;
-  private GenericEntry softwarePracticeEnabled;
-  private GenericEntry softwareClassroomMode;
+  // Fuel subsystem test controls
+  private GenericEntry pitTestIntake;
+  private GenericEntry pitTestEject;
+  private GenericEntry pitTestLaunch;
+  private GenericEntry pitStopFuel;
 
   // =====================================================================══════
   // RATE LIMITING - Reduce network load by updating less frequently
@@ -106,9 +92,11 @@ public class DashboardSetup {
   public DashboardSetup(
       DriveSubsystem driveSubsystem,
       MatchStateTracker matchStateTracker,
+      CANFuelSubsystem fuelSubsystem,
       SendableChooser<Command> autoChooser) {
     this.driveSubsystem = driveSubsystem;
     this.matchStateTracker = matchStateTracker;
+    this.fuelSubsystem = fuelSubsystem;
     this.autoChooser = autoChooser;
     this.frontCameraKey = "Vision/" + VisionConstants.kFrontCameraName;
     this.backCameraKey = "Vision/" + VisionConstants.kBackCameraName;
@@ -134,25 +122,16 @@ public class DashboardSetup {
       DriverStation.reportError("DashboardSetup: Pit tab failed: " + e.getMessage(), e.getStackTrace());
     }
 
-    try {
-      configureVisionTab();
-      System.out.println("DashboardSetup: Vision tab configured");
-    } catch (Exception e) {
-      DriverStation.reportError("DashboardSetup: Vision tab failed: " + e.getMessage(), e.getStackTrace());
-    }
-
-    try {
-      configureSoftwareTab();
-      System.out.println("DashboardSetup: Software tab configured");
-    } catch (Exception e) {
-      DriverStation.reportError("DashboardSetup: Software tab failed: " + e.getMessage(), e.getStackTrace());
-    }
-
     // Initialize defaults
     SmartDashboard.putBoolean("Vision/Enabled", true);
     SmartDashboard.putBoolean("Vision/ClassroomMode", false);
+    SmartDashboard.putBoolean("Practice/Enabled", false);
+
+    // Set Match tab as the default view
+    Shuffleboard.selectTab("Match");
 
     System.out.println("DashboardSetup: All tabs configured successfully!");
+    System.out.println("DashboardSetup: Match tab set as default");
   }
 
   private void configureMatchTab() {
@@ -185,50 +164,29 @@ public class DashboardSetup {
   private void configurePitTab() {
     ShuffleboardTab tab = Shuffleboard.getTab("Pit");
 
-    // System status row
+    // ========== ROW 0: PRE-MATCH CHECKLIST ==========
     pitBattery = tab.add("Battery V", 0.0).withPosition(0, 0).withSize(1, 1).getEntry();
-    pitBatteryStatus = tab.add("Battery", "---").withPosition(1, 0).withSize(1, 1).getEntry();
-    pitVisionHealthy = tab.add("Vision OK", false).withPosition(2, 0).withSize(1, 1).getEntry();
-    pitCameraCount = tab.add("Cameras", 0).withPosition(3, 0).withSize(1, 1).getEntry();
-    pitCanUtil = tab.add("CAN %", 0.0).withPosition(4, 0).withSize(1, 1).getEntry();
+    pitBatteryStatus = tab.add("Battery Status", "---").withPosition(1, 0).withSize(2, 1).getEntry();
+    pitVisionHealthy = tab.add("Vision Healthy", false).withPosition(3, 0).withSize(1, 1).getEntry();
+    pitCameraCount = tab.add("Cameras", 0).withPosition(4, 0).withSize(1, 1).getEntry();
+    pitCanUtil = tab.add("CAN Bus %", 0.0).withPosition(5, 0).withSize(1, 1).getEntry();
 
-    // Command buttons
-    pitSetWheelsStraight = tab.add("Wheels Straight", false).withPosition(0, 1).withSize(2, 1).getEntry();
+    // ========== ROW 1: DRIVE SYSTEM SETUP ==========
+    pitSetWheelsStraight = tab.add("Set Wheels Straight", false).withPosition(0, 1).withSize(2, 1).getEntry();
     pitZeroHeading = tab.add("Zero Heading", false).withPosition(2, 1).withSize(2, 1).getEntry();
-    pitCoastMode = tab.add("Coast Mode", false).withPosition(0, 2).withSize(2, 1).getEntry();
-    pitBrakeMode = tab.add("Brake Mode", false).withPosition(2, 2).withSize(2, 1).getEntry();
-    pitVisionReset = tab.add("Vision Reset", false).withPosition(4, 1).withSize(2, 1).getEntry();
+    pitCoastMode = tab.add("Coast Mode", false).withPosition(4, 1).withSize(1, 1).getEntry();
+    pitBrakeMode = tab.add("Brake Mode", false).withPosition(5, 1).withSize(1, 1).getEntry();
+
+    // ========== ROW 2: VISION SYSTEM ==========
+    pitVisionReset = tab.add("Reset Vision", false).withPosition(0, 2).withSize(2, 1).getEntry();
+
+    // ========== ROWS 3-4: FUEL SUBSYSTEM TESTING ==========
+    pitTestIntake = tab.add("Test Intake", false).withPosition(0, 3).withSize(2, 1).getEntry();
+    pitTestEject = tab.add("Test Eject", false).withPosition(2, 3).withSize(2, 1).getEntry();
+    pitTestLaunch = tab.add("Test Launch", false).withPosition(4, 3).withSize(2, 1).getEntry();
+    pitStopFuel = tab.add("STOP Fuel", false).withPosition(0, 4).withSize(2, 2).getEntry();
   }
 
-  private void configureVisionTab() {
-    ShuffleboardTab tab = Shuffleboard.getTab("Vision");
-
-    // Overall status
-    visionHealthy = tab.add("Healthy", false).withPosition(0, 0).withSize(1, 1).getEntry();
-    visionEnabled = tab.add("Enabled", true).withPosition(1, 0).withSize(1, 1).getEntry();
-    visionTotalTags = tab.add("Total Tags", 0).withPosition(2, 0).withSize(1, 1).getEntry();
-    visionAccepted = tab.add("Accepted", 0).withPosition(3, 0).withSize(1, 1).getEntry();
-    visionRejected = tab.add("Rejected", 0).withPosition(4, 0).withSize(1, 1).getEntry();
-
-    // Per-camera status
-    visionFrontConnected = tab.add("Front Connected", false).withPosition(0, 1).withSize(2, 1).getEntry();
-    visionFrontTargets = tab.add("Front Targets", 0).withPosition(2, 1).withSize(1, 1).getEntry();
-    visionBackConnected = tab.add("Back Connected", false).withPosition(0, 2).withSize(2, 1).getEntry();
-    visionBackTargets = tab.add("Back Targets", 0).withPosition(2, 2).withSize(1, 1).getEntry();
-  }
-
-  private void configureSoftwareTab() {
-    ShuffleboardTab tab = Shuffleboard.getTab("Software");
-
-    // System info
-    softwareBattery = tab.add("Battery V", 0.0).withPosition(0, 0).withSize(1, 1).getEntry();
-    softwareBrownout = tab.add("Brownout", false).withPosition(1, 0).withSize(1, 1).getEntry();
-    softwareCanUtil = tab.add("CAN %", 0.0).withPosition(2, 0).withSize(1, 1).getEntry();
-
-    // Mode toggles
-    softwarePracticeEnabled = tab.add("Practice Mode", false).withPosition(0, 1).withSize(2, 1).getEntry();
-    softwareClassroomMode = tab.add("Classroom Mode", false).withPosition(2, 1).withSize(2, 1).getEntry();
-  }
 
   /**
    * Updates all dashboard values. Call from Robot.robotPeriodic().
@@ -248,16 +206,9 @@ public class DashboardSetup {
     // Update all tabs (rate-limited)
     updateMatchTab();
     updatePitTab();
-    updateVisionTab();
-    updateSoftwareTab();
 
     // Update field
     matchField.setRobotPose(driveSubsystem.getCurrentPose());
-
-    // Sync toggles to SmartDashboard for other systems
-    SmartDashboard.putBoolean("Vision/Enabled", visionEnabled.getBoolean(true));
-    SmartDashboard.putBoolean("Vision/ClassroomMode", softwareClassroomMode.getBoolean(false));
-    SmartDashboard.putBoolean("Practice/Enabled", softwarePracticeEnabled.getBoolean(false));
   }
 
   private void updateMatchTab() {
@@ -282,32 +233,27 @@ public class DashboardSetup {
   private void updatePitTab() {
     double voltage = RobotController.getBatteryVoltage();
     pitBattery.setDouble(round1(voltage));
-    pitBatteryStatus.setString(voltage >= 12.0 ? "GOOD" : voltage >= 11.0 ? "OK" : "LOW");
+
+    // Battery status with clear visual feedback
+    if (voltage >= 12.0) {
+      pitBatteryStatus.setString("GOOD - Ready for match");
+    } else if (voltage >= 11.5) {
+      pitBatteryStatus.setString("OK - Use for practice");
+    } else if (voltage >= 11.0) {
+      pitBatteryStatus.setString("LOW - Charge soon");
+    } else {
+      pitBatteryStatus.setString("CRITICAL - Charge now!");
+    }
+
     pitVisionHealthy.setBoolean(driveSubsystem.isVisionHealthy());
     pitCameraCount.setInteger((int) SmartDashboard.getNumber("Vision/CameraCount", 0));
     pitCanUtil.setDouble(round1(RobotController.getCANStatus().percentBusUtilization));
   }
 
-  private void updateVisionTab() {
-    visionHealthy.setBoolean(driveSubsystem.isVisionHealthy());
-    visionTotalTags.setInteger((int) SmartDashboard.getNumber("Vision/TotalTagCount", 0));
-    visionAccepted.setInteger((int) SmartDashboard.getNumber("Vision/PosesAccepted", 0));
-    visionRejected.setInteger((int) SmartDashboard.getNumber("Vision/PosesRejected", 0));
-
-    visionFrontConnected.setBoolean(SmartDashboard.getBoolean(frontCameraKey + "/Connected", false));
-    visionFrontTargets.setInteger((int) SmartDashboard.getNumber(frontCameraKey + "/TargetCount", 0));
-    visionBackConnected.setBoolean(SmartDashboard.getBoolean(backCameraKey + "/Connected", false));
-    visionBackTargets.setInteger((int) SmartDashboard.getNumber(backCameraKey + "/TargetCount", 0));
-  }
-
-  private void updateSoftwareTab() {
-    softwareBattery.setDouble(round1(RobotController.getBatteryVoltage()));
-    softwareBrownout.setBoolean(RobotController.isBrownedOut());
-    softwareCanUtil.setDouble(round1(RobotController.getCANStatus().percentBusUtilization));
-  }
-
   private void checkPitCommands() {
     CommandScheduler scheduler = CommandScheduler.getInstance();
+
+    // ========== DRIVE SYSTEM COMMANDS ==========
     if (pitSetWheelsStraight.getBoolean(false)) {
       pitSetWheelsStraight.setBoolean(false);
       scheduler.schedule(UtilityCommands.setStraightAhead(driveSubsystem));
@@ -324,9 +270,39 @@ public class DashboardSetup {
       pitBrakeMode.setBoolean(false);
       scheduler.schedule(UtilityCommands.setBrakeMode(driveSubsystem));
     }
+
+    // ========== VISION SYSTEM COMMANDS ==========
     if (pitVisionReset.getBoolean(false)) {
       pitVisionReset.setBoolean(false);
       scheduler.schedule(UtilityCommands.forceVisionReset(driveSubsystem));
+    }
+
+    // ========== FUEL SUBSYSTEM TEST COMMANDS ==========
+    if (pitTestIntake.getBoolean(false)) {
+      pitTestIntake.setBoolean(false);
+      scheduler.schedule(fuelSubsystem.runOnce(() -> fuelSubsystem.intake())
+          .withTimeout(2.0)
+          .andThen(() -> fuelSubsystem.stop()));
+      System.out.println("Pit: Testing intake (2 seconds)");
+    }
+    if (pitTestEject.getBoolean(false)) {
+      pitTestEject.setBoolean(false);
+      scheduler.schedule(fuelSubsystem.runOnce(() -> fuelSubsystem.eject())
+          .withTimeout(2.0)
+          .andThen(() -> fuelSubsystem.stop()));
+      System.out.println("Pit: Testing eject (2 seconds)");
+    }
+    if (pitTestLaunch.getBoolean(false)) {
+      pitTestLaunch.setBoolean(false);
+      scheduler.schedule(fuelSubsystem.runOnce(() -> fuelSubsystem.launch())
+          .withTimeout(2.0)
+          .andThen(() -> fuelSubsystem.stop()));
+      System.out.println("Pit: Testing launch (2 seconds)");
+    }
+    if (pitStopFuel.getBoolean(false)) {
+      pitStopFuel.setBoolean(false);
+      fuelSubsystem.stop();
+      System.out.println("Pit: Stopped fuel subsystem");
     }
   }
 

@@ -154,7 +154,7 @@ public class RobotContainer {
     // =====================================================================
     // STEP 5: Configure dashboard (see config/DashboardSetup.java)
     // =====================================================================
-    dashboardSetup = new DashboardSetup(drive, matchState, autoSelector.getChooser());
+    dashboardSetup = new DashboardSetup(drive, matchState, ballSubsystem, autoSelector.getChooser());
     dashboardSetup.configureAll();
 
     // =====================================================================
