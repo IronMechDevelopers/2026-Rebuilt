@@ -13,7 +13,6 @@ import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.button.CommandPS5Controller;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.commands.DriveCommands;
 import frc.robot.config.AutoSelector;
@@ -48,9 +47,8 @@ import frc.robot.subsystems.VisionProvider;
  *   - New subsystems: config/SubsystemSetup.java
  *
  * Controller Ports:
- *   - 0: Driver left joystick (Thrustmaster)
- *   - 1: Driver right joystick (Thrustmaster)
- *   - 2: Co-driver controller (PlayStation)
+ *   - 0: Driver controller (Xbox)
+ *   - 1: Co-driver controller (Xbox)
  */
 public class RobotContainer {
 
@@ -70,11 +68,11 @@ public class RobotContainer {
 
   // CONTROLLERS
 
-  /** Driver left joystick (Thrustmaster) - Translation control */
+  /** Driver Xbox controller */
   private final CommandXboxController driver = new CommandXboxController(HardwareConstants.kDriverControllerPort);
 
-  /** Co-driver PlayStation controller */
-  private final CommandPS5Controller coDriver = new CommandPS5Controller(HardwareConstants.kCoDriverControllerPort);
+  /** Co-driver Xbox controller */
+  private final CommandXboxController coDriver = new CommandXboxController(HardwareConstants.kCoDriverControllerPort);
 
   // =========================================================================
   // CONFIGURATION OBJECTS

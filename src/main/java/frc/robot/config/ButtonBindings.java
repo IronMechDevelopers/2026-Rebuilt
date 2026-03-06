@@ -13,7 +13,6 @@ import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.button.CommandPS5Controller;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 import frc.robot.commands.DriveCommands;
@@ -31,32 +30,23 @@ import frc.robot.subsystems.DriveSubsystem;
  *
  * CONTROLLER LAYOUT:
  *
- *   DRIVER (Thrustmaster Joysticks):
- *     - Left stick: Move forward/back, left/right
- *     - Right stick X: Rotate
- *     - Right stick Button 1: Toggle speed (full/half)
- *     - Right stick Button 2: Zero heading
- *     - Right stick Button 3: EMERGENCY OVERRIDE
- *     - Left stick Button 1: Toggle field-relative
+ *   DRIVER (Xbox Controller):
+ *     Left Stick Click: Gyro reset (zero heading)
+ *     A Button: Hub lock - Aim at hub then X-stance (toggle)
+ *     B Button: Robot relative mode (toggle field-centric)
+ *     X Button: X-Stance (toggle)
+ *     Y Button: Precision mode (50% speed, hold)
+ *     Left Trigger: Intake (hold)
+ *     Left Bumper: Eject (hold)
+ *     Right Trigger: Shoot (hold)
+ *     Right Bumper: Diamond snap (45° angles, hold)
+ *     POV Up: Sniper mode - Auto-aim at hub while strafing (toggle)
  *
- *   CO-DRIVER (PlayStation Controller):
- *     Face Buttons (Vision/Shooting):
- *       Triangle: Drive while aiming at hub (driver controls movement)
- *       Circle: Aim at hub → X-stance (locks driver out while held)
- *       Cross: Drive to test target
- *       Square: X-stance (safety lock)
- *
- *     Bumpers (Speed Control):
- *       L1: Switch to SLOW mode
- *       R1: Switch to FAST mode
- *
- *     Triggers (Rotation Snap):
- *       L2: Snap to cardinal (0/90/180/270)
- *       R2: Snap to diamond (45/135/225/315)
- *
- *     Utilities:
- *       Touchpad: Force vision reset
- *       Options: Reload test target from dashboard
+ *   CO-DRIVER (Xbox Controller):
+ *     A Button: Shoot (hold)
+ *     B Button: Eject (hold)
+ *     X Button: Intake (hold)
+ *     Y Button: Square snap (90° angles, hold)
  *
  * HOW TO ADD A NEW BUTTON:
  *   1. Find the button you want to use (see layout above)
@@ -71,7 +61,7 @@ public class ButtonBindings {
 
   // Controllers
   private final CommandXboxController driver;
-  private final CommandPS5Controller coDriver;
+  private final CommandXboxController coDriver;
 
   // Subsystems
   private final DriveSubsystem driveSubsystem;
@@ -89,9 +79,9 @@ public class ButtonBindings {
    * Creates button bindings.
    *
    * @param driveSubsystem The drive subsystem
-   * @param driverLeftStick Driver's left joystick
-   * @param driverRightStick Driver's right joystick
-   * @param coDriver Co-driver's PS5 controller
+   * @param ballSubsystem The fuel subsystem
+   * @param driver Driver's Xbox controller
+   * @param coDriver Co-driver's Xbox controller
    * @param testTargetSupplier Gets the current test target
    * @param testTargetUpdater Updates the test target
    */
@@ -99,7 +89,7 @@ public class ButtonBindings {
       DriveSubsystem driveSubsystem,
       CANFuelSubsystem ballSubsystem,
       CommandXboxController driver,
-      CommandPS5Controller coDriver,
+      CommandXboxController coDriver,
       Supplier<Pose2d> testTargetSupplier,
       Consumer<Pose2d> testTargetUpdater) {
     this.driveSubsystem = driveSubsystem;
@@ -129,56 +119,87 @@ public class ButtonBindings {
   // =========================================================================
 
   /**
-   * Configures driver joystick buttons.
+   * Configures driver Xbox controller buttons.
    */
   private void configureDriverBindings() {
-    // Right stick button 1: Toggle speed (full/half)
+    // Left stick click: Gyro reset (zero heading)
+    driver.leftStick().onTrue(DriveCommands.zeroHeading(driveSubsystem));
 
-    driver.povUp().onTrue(Commands.runOnce(() -> driveSubsystem.zeroHeading() ,driveSubsystem));
-    
+    // Y button: Precision mode (50% speed while held)
+    driver.y()
+        .onTrue(DriveCommands.setSpeed(driveSubsystem, 0.5))
+        .onFalse(DriveCommands.setSpeed(driveSubsystem, 1.0));
+
+    // B button: Toggle robot-relative mode
+    driver.b().onTrue(DriveCommands.toggleFieldRelative(driveSubsystem));
+
+    // X button: Toggle X-Stance
+    driver.x().toggleOnTrue(DriveCommands.xStance(driveSubsystem));
+
+    // Left trigger: Intake (hold)
+    driver.leftTrigger()
+        .whileTrue(ballSubsystem.runEnd(() -> ballSubsystem.intake(), () -> ballSubsystem.stop()));
+
+    // Left bumper: Eject (hold)
+    driver.leftBumper()
+        .whileTrue(ballSubsystem.runEnd(() -> ballSubsystem.eject(), () -> ballSubsystem.stop()));
+
+    // Right trigger: Shoot (hold - spin up for 1s then launch)
+    driver.rightTrigger()
+        .whileTrue(ballSubsystem.spinUpCommand().withTimeout(FuelConstants.SPIN_UP_SECONDS)
+            .andThen(ballSubsystem.launchCommand())
+            .finallyDo(() -> ballSubsystem.stop()));
+
+    // Right bumper: Diamond snap (45° angles while held)
+    driver.rightBumper()
+        .whileTrue(DriveCommands.snapToDiamond(
+            driveSubsystem,
+            () -> -driver.getLeftY(),
+            () -> -driver.getLeftX()));
+
+    // POV Up: Sniper mode (auto-aim at hub while allowing strafing, toggle)
+    driver.povUp()
+        .toggleOnTrue(DriveCommands.driveWhileAimingAtHub(
+            driveSubsystem,
+            () -> -driver.getLeftY(),
+            () -> -driver.getLeftX()));
+
+    // A button: Hub lock (aim at hub then X-stance, toggle)
+    driver.a()
+        .toggleOnTrue(
+            DriveCommands.aimAtHub(driveSubsystem)
+                .andThen(DriveCommands.xStance(driveSubsystem)));
   }
 
 
 
   // =========================================================================
-  // CO-DRIVER CONTROLS (PlayStation Controller)
+  // CO-DRIVER CONTROLS (Xbox Controller)
   // =========================================================================
 
   /**
-   * Configures co-driver PS5 controller buttons.
+   * Configures co-driver Xbox controller buttons.
    */
   private void configureCoDriverBindings() {
-    // =====================================================================
-    // FACE BUTTONS - Vision Testing
-    // =====================================================================
-
-
-
-    // Circle button: Aim at hub, then hold X-stance (driver can't move while held)
-    // coDriver.circle()
-    //     .whileTrue(Commands.deferredProxy(() ->
-    //         DriveCommands.aimAtHub(driveSubsystem)
-    //             .andThen(DriveCommands.xStance(driveSubsystem))));
-
-    // // Square button: X-stance (makes an X pattern with wheels)
-    // coDriver.square()
-    //     .whileTrue(DriveCommands.xStance(driveSubsystem));
-
-      coDriver.square()
+    // X button: Intake (hold)
+    coDriver.x()
         .whileTrue(ballSubsystem.runEnd(() -> ballSubsystem.intake(), () -> ballSubsystem.stop()));
 
-      coDriver.cross().whileTrue(ballSubsystem.spinUpCommand().withTimeout(FuelConstants.SPIN_UP_SECONDS)
+    // B button: Eject (hold)
+    coDriver.b()
+        .whileTrue(ballSubsystem.runEnd(() -> ballSubsystem.eject(), () -> ballSubsystem.stop()));
+
+    // A button: Shoot (hold - spin up for 1s then launch)
+    coDriver.a()
+        .whileTrue(ballSubsystem.spinUpCommand().withTimeout(FuelConstants.SPIN_UP_SECONDS)
             .andThen(ballSubsystem.launchCommand())
             .finallyDo(() -> ballSubsystem.stop()));
 
-      coDriver.circle().whileTrue(ballSubsystem.runEnd(() -> ballSubsystem.eject(), () -> ballSubsystem.stop()));
-
-
-
-    // =====================================================================
-    // D-PAD - Reserved for future use
-    // =====================================================================
-    // Available for game-specific commands or preset speeds if needed
-    // Example: coDriver.povUp().onTrue(intakeCommand);
+    // Y button: Square snap (90° angles while held)
+    coDriver.y()
+        .whileTrue(DriveCommands.snapToClosestCardinal(
+            driveSubsystem,
+            () -> -driver.getLeftY(),
+            () -> -driver.getLeftX()));
   }
 }
