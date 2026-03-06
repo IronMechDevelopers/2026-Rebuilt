@@ -8,12 +8,13 @@ import java.util.function.DoubleSupplier;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.subsystems.DriveSubsystem;
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * =====================================================================══════
  *                           DRIVE COMMANDS
- * ═══════════════════════════════════════════════════════════════════════════
+ * =====================================================================══════
  *
  * THE MAIN ENTRY POINT FOR ALL DRIVE COMMANDS.
  *
@@ -160,5 +161,10 @@ public class DriveCommands {
       DoubleSupplier xInput,
       DoubleSupplier yInput) {
     return UtilityCommands.snapToDiamond(drive, xInput, yInput);
+  }
+
+  public static Command moveOneWheel(DriveSubsystem drive)
+  {
+    return Commands.startEnd(() -> drive.moveOneWheel(), () -> drive.setStraightAhead(), drive);
   }
 }

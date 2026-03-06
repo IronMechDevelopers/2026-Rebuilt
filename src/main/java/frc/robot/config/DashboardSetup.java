@@ -46,9 +46,9 @@ public class DashboardSetup {
   // Field visualizations (one per tab - can't share Sendables)
   private final Field2d matchField = new Field2d();
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // =====================================================================══════
   // MATCH TAB
-  // ═══════════════════════════════════════════════════════════════════════════
+  // =====================================================================══════
   private GenericEntry matchHubActive;
   private GenericEntry matchHubStatus;
   private GenericEntry matchShiftCountdown;
@@ -57,9 +57,9 @@ public class DashboardSetup {
   private GenericEntry matchBattery;
   private GenericEntry matchVisionHealthy;
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // =====================================================================══════
   // PIT TAB
-  // ═══════════════════════════════════════════════════════════════════════════
+  // =====================================================================══════
   private GenericEntry pitBattery;
   private GenericEntry pitBatteryStatus;
   private GenericEntry pitVisionHealthy;
@@ -71,9 +71,9 @@ public class DashboardSetup {
   private GenericEntry pitBrakeMode;
   private GenericEntry pitVisionReset;
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // =====================================================================══════
   // VISION TAB
-  // ═══════════════════════════════════════════════════════════════════════════
+  // =====================================================================══════
   private GenericEntry visionHealthy;
   private GenericEntry visionEnabled;
   private GenericEntry visionTotalTags;
@@ -84,14 +84,20 @@ public class DashboardSetup {
   private GenericEntry visionBackConnected;
   private GenericEntry visionBackTargets;
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // =====================================================================══════
   // SOFTWARE TAB
-  // ═══════════════════════════════════════════════════════════════════════════
+  // =====================================================================══════
   private GenericEntry softwareBattery;
   private GenericEntry softwareBrownout;
   private GenericEntry softwareCanUtil;
   private GenericEntry softwarePracticeEnabled;
   private GenericEntry softwareClassroomMode;
+
+  // =====================================================================══════
+  // RATE LIMITING - Reduce network load by updating less frequently
+  // =====================================================================══════
+  private static final int DASHBOARD_UPDATE_INTERVAL_MS = 100; // Update every 100ms (5x slower)
+  private long lastDashboardUpdateTime = 0;
 
   public DashboardSetup(
       DriveSubsystem driveSubsystem,
@@ -214,12 +220,20 @@ public class DashboardSetup {
 
   /**
    * Updates all dashboard values. Call from Robot.robotPeriodic().
+   * Rate-limited to reduce network load and prevent loop overruns.
    */
   public void periodic() {
-    // Check pit commands first
+    // Check pit commands every cycle (responsive to button presses)
     checkPitCommands();
 
-    // Update all tabs
+    // Rate-limit dashboard updates to reduce network load
+    long currentTime = System.currentTimeMillis();
+    if (currentTime - lastDashboardUpdateTime < DASHBOARD_UPDATE_INTERVAL_MS) {
+      return; // Skip this cycle
+    }
+    lastDashboardUpdateTime = currentTime;
+
+    // Update all tabs (rate-limited)
     updateMatchTab();
     updatePitTab();
     updateVisionTab();

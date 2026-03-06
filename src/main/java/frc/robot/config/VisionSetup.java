@@ -10,15 +10,17 @@ import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.RobotBase;
 import frc.robot.constants.VisionConstants;
 import frc.robot.subsystems.NoVisionProvider;
+import frc.robot.subsystems.SimVisionProvider;
 import frc.robot.subsystems.VisionProvider;
 import frc.robot.subsystems.VisionSubsystem;
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * =====================================================================══════
  *                              VISION SETUP
- * ═══════════════════════════════════════════════════════════════════════════
+ * =====================================================================══════
  *
  * This file sets up the vision cameras and AprilTags.
  *
@@ -44,10 +46,15 @@ public class VisionSetup {
   /**
    * Creates vision provider with automatic fallback if vision unavailable.
    *
-   * <p>If cameras aren't working, this returns a "fake" vision provider
-   * that does nothing. This way the robot still works without vision.
+   * <p>In simulation mode, this creates a SimVisionProvider that simulates
+   * camera detection of AprilTags. The simulated camera can "see" tags
+   * within 9 feet in front of the robot.
    *
-   * @return VisionSubsystem (real cameras) or NoVisionProvider (fallback)
+   * <p>On a real robot, this creates the normal VisionSubsystem with PhotonVision.
+   *
+   * <p>If cameras aren't working, this returns a NoVisionProvider that does nothing.
+   *
+   * @return VisionSubsystem (real), SimVisionProvider (simulation), or NoVisionProvider (fallback)
    */
   public static VisionProvider createVisionProvider() {
     try {
@@ -62,11 +69,20 @@ public class VisionSetup {
         return new NoVisionProvider();
       }
 
-      // Step 2: Create camera configurations for front and back cameras
+      // Step 2: Check if we're in simulation mode
+      if (!RobotBase.isReal()) {
+        DriverStation.reportWarning(
+          "Simulation detected - using SimVisionProvider (9 ft range, 70° FOV)",
+          false
+        );
+        return new SimVisionProvider(fieldLayout);
+      }
+
+      // Step 3: Real robot - Create camera configurations for front and back cameras
       Transform3d frontCameraTransform = createFrontCameraTransform();
       Transform3d backCameraTransform = createBackCameraTransform();
 
-      // Step 3: Create VisionSubsystem with BOTH cameras
+      // Step 4: Create VisionSubsystem with BOTH cameras
       return new VisionSubsystem(
         fieldLayout,
         new VisionSubsystem.CameraConfig(VisionConstants.kFrontCameraName, frontCameraTransform),

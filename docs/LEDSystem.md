@@ -74,7 +74,7 @@ The LEDs automatically display match state without any driver input:
 
 ```
 SHIFT TIMELINE (25 seconds)
-═══════════════════════════════════════════════════════════════════════════════
+=====================================================================══════════
 
 Start                        Mid-warning              Final warning    End
   │                              │                          │           │

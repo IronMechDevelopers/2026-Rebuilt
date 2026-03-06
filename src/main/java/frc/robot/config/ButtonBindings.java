@@ -14,15 +14,18 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandPS5Controller;
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 import frc.robot.commands.DriveCommands;
 import frc.robot.constants.DriveConstants;
+import frc.robot.constants.FuelConstants;
+import frc.robot.subsystems.CANFuelSubsystem;
 import frc.robot.subsystems.DriveSubsystem;
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * =====================================================================══════
  *                            BUTTON BINDINGS
- * ═══════════════════════════════════════════════════════════════════════════
+ * =====================================================================══════
  *
  * This file sets up what each button on the controllers does.
  *
@@ -37,10 +40,10 @@ import frc.robot.subsystems.DriveSubsystem;
  *     - Left stick Button 1: Toggle field-relative
  *
  *   CO-DRIVER (PlayStation Controller):
- *     Face Buttons (Vision Testing):
- *       Triangle: Heading lock test
- *       Circle: Auto-aim test
- *       Cross: Drive to distance test
+ *     Face Buttons (Vision/Shooting):
+ *       Triangle: Drive while aiming at hub (driver controls movement)
+ *       Circle: Aim at hub → X-stance (locks driver out while held)
+ *       Cross: Drive to test target
  *       Square: X-stance (safety lock)
  *
  *     Bumpers (Speed Control):
@@ -67,12 +70,12 @@ import frc.robot.subsystems.DriveSubsystem;
 public class ButtonBindings {
 
   // Controllers
-  private final Joystick driverLeftStick;
-  private final Joystick driverRightStick;
+  private final CommandXboxController driver;
   private final CommandPS5Controller coDriver;
 
   // Subsystems
   private final DriveSubsystem driveSubsystem;
+  private final CANFuelSubsystem ballSubsystem;
 
   // Test target (for vision testing)
   private final Supplier<Pose2d> testTargetSupplier;
@@ -94,14 +97,14 @@ public class ButtonBindings {
    */
   public ButtonBindings(
       DriveSubsystem driveSubsystem,
-      Joystick driverLeftStick,
-      Joystick driverRightStick,
+      CANFuelSubsystem ballSubsystem,
+      CommandXboxController driver,
       CommandPS5Controller coDriver,
       Supplier<Pose2d> testTargetSupplier,
       Consumer<Pose2d> testTargetUpdater) {
     this.driveSubsystem = driveSubsystem;
-    this.driverLeftStick = driverLeftStick;
-    this.driverRightStick = driverRightStick;
+    this.ballSubsystem=ballSubsystem;
+    this.driver=driver;
     this.coDriver = coDriver;
     this.testTargetSupplier = testTargetSupplier;
     this.testTargetUpdater = testTargetUpdater;
@@ -130,36 +133,12 @@ public class ButtonBindings {
    */
   private void configureDriverBindings() {
     // Right stick button 1: Toggle speed (full/half)
-    new JoystickButton(driverRightStick, 1)
-        .onTrue(DriveCommands.toggleSpeed(driveSubsystem));
 
-    // Right stick button 2: Zero heading (face AWAY from driver station first!)
-    new JoystickButton(driverRightStick, 2)
-        .onTrue(DriveCommands.zeroHeading(driveSubsystem));
-
-    // Right stick button 3: EMERGENCY OVERRIDE (cancels any running command)
-    new JoystickButton(driverRightStick, 3)
-        .onTrue(new Command() {
-          {
-            setName("EmergencyOverride");
-            addRequirements(driveSubsystem);
-          }
-
-          @Override
-          public void initialize() {
-            System.out.println("EMERGENCY OVERRIDE - Driver has control");
-          }
-
-          @Override
-          public boolean isFinished() {
-            return true;
-          }
-        });
-
-    // Left stick button 1: Toggle field-relative driving
-    new JoystickButton(driverLeftStick, 1)
-        .onTrue(DriveCommands.toggleFieldRelative(driveSubsystem));
+    driver.povUp().onTrue(Commands.runOnce(() -> driveSubsystem.zeroHeading() ,driveSubsystem));
+    
   }
+
+
 
   // =========================================================================
   // CO-DRIVER CONTROLS (PlayStation Controller)
@@ -169,101 +148,36 @@ public class ButtonBindings {
    * Configures co-driver PS5 controller buttons.
    */
   private void configureCoDriverBindings() {
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // FACE BUTTONS - Vision Testing
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
 
-    // Triangle button: Drive while aiming (driver controls translation, robot auto-rotates)
-    coDriver.triangle()
-        .whileTrue(Commands.deferredProxy(() ->
-            DriveCommands.driveWhileAiming(
-                driveSubsystem,
-                () -> -driverLeftStick.getY(),
-                () -> -driverLeftStick.getX(),
-                testTargetSupplier.get(),
-                0.0  // Aim with front of robot (0 degrees)
-            )));
 
-    // Circle button: Aim at target (rotate to face test target)
-    coDriver.circle()
-        .whileTrue(Commands.deferredProxy(() ->
-            DriveCommands.aimAtTarget(driveSubsystem, testTargetSupplier.get())));
 
-    // Square button: X-stance (makes an X pattern with wheels)
-    coDriver.square()
-        .whileTrue(DriveCommands.xStance(driveSubsystem));
+    // Circle button: Aim at hub, then hold X-stance (driver can't move while held)
+    // coDriver.circle()
+    //     .whileTrue(Commands.deferredProxy(() ->
+    //         DriveCommands.aimAtHub(driveSubsystem)
+    //             .andThen(DriveCommands.xStance(driveSubsystem))));
 
-    // Cross button: Drive to test target
-    coDriver.cross()
-        .whileTrue(Commands.deferredProxy(() ->
-            DriveCommands.driveToPose(driveSubsystem, testTargetSupplier.get())));
+    // // Square button: X-stance (makes an X pattern with wheels)
+    // coDriver.square()
+    //     .whileTrue(DriveCommands.xStance(driveSubsystem));
 
-    // ═════════════════════════════════════════════════════════════════════
-    // BUMPERS - Speed Control
-    // ═════════════════════════════════════════════════════════════════════
+      coDriver.square()
+        .whileTrue(ballSubsystem.runEnd(() -> ballSubsystem.intake(), () -> ballSubsystem.stop()));
 
-    // L1 button: Switch to SLOW mode (safe for practice)
-    coDriver.L1()
-        .onTrue(DriveCommands.setSpeed(driveSubsystem, DriveConstants.kHalfSpeedMultiplier));
+      coDriver.cross().whileTrue(ballSubsystem.spinUpCommand().withTimeout(FuelConstants.SPIN_UP_SECONDS)
+            .andThen(ballSubsystem.launchCommand())
+            .finallyDo(() -> ballSubsystem.stop()));
 
-    // R1 button: Switch to FAST mode (when confident)
-    coDriver.R1()
-        .onTrue(DriveCommands.setSpeed(driveSubsystem, DriveConstants.kFullSpeedMultiplier));
+      coDriver.circle().whileTrue(ballSubsystem.runEnd(() -> ballSubsystem.eject(), () -> ballSubsystem.stop()));
 
-    // ═════════════════════════════════════════════════════════════════════
-    // TRIGGERS - Rotation Snap
-    // ═════════════════════════════════════════════════════════════════════
 
-    // L2 trigger: Snap to cardinal angle (0/90/180/270 deg)
-    coDriver.L2()
-        .whileTrue(DriveCommands.snapToClosestCardinal(
-            driveSubsystem,
-            () -> -driverLeftStick.getY(),
-            () -> -driverLeftStick.getX()
-        ));
 
-    // R2 trigger: Snap to diamond angle (45/135/225/315 deg)
-    coDriver.R2()
-        .whileTrue(DriveCommands.snapToDiamond(
-            driveSubsystem,
-            () -> -driverLeftStick.getY(),
-            () -> -driverLeftStick.getX()
-        ));
-
-    // ═════════════════════════════════════════════════════════════════════
-    // UTILITIES
-    // ═════════════════════════════════════════════════════════════════════
-
-    // Touchpad button: Force vision reset (snap odometry to AprilTag)
-    coDriver.touchpad()
-        .onTrue(DriveCommands.forceVisionReset(driveSubsystem));
-
-    // Options button: Reload test target from dashboard
-    coDriver.options()
-        .onTrue(new Command() {
-          {
-            setName("UpdateTestTarget");
-          }
-
-          @Override
-          public void initialize() {
-            double x = SmartDashboard.getNumber("Test/TargetX", DriveConstants.kDefaultTestTargetX);
-            double y = SmartDashboard.getNumber("Test/TargetY", DriveConstants.kDefaultTestTargetY);
-            double heading = SmartDashboard.getNumber("Test/TargetHeading", DriveConstants.kDefaultTestTargetHeadingDegrees);
-            Pose2d newTarget = new Pose2d(x, y, Rotation2d.fromDegrees(heading));
-            testTargetUpdater.accept(newTarget);
-            System.out.println("Test target updated: (" + x + ", " + y + ", " + heading + " deg)");
-          }
-
-          @Override
-          public boolean isFinished() {
-            return true;
-          }
-        }.ignoringDisable(true));
-
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // D-PAD - Reserved for future use
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // Available for game-specific commands or preset speeds if needed
     // Example: coDriver.povUp().onTrue(intakeCommand);
   }

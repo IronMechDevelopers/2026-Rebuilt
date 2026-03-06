@@ -11,9 +11,9 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * =====================================================================══════
  *                            AUTO SELECTOR
- * ═══════════════════════════════════════════════════════════════════════════
+ * =====================================================================══════
  *
  * This file sets up which autonomous routines you can choose from.
  *
@@ -108,9 +108,9 @@ public class AutoSelector {
     SendableChooser<Command> chooser = new SendableChooser<>();
     chooser.setDefaultOption("None", null);
 
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // TEST AUTOS - Safe, simple paths for verifying PathPlanner works
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     try {
       // Test Auto 1: Simple straight line (2 meters forward)
@@ -127,9 +127,9 @@ public class AutoSelector {
       System.out.println("   See AutoSelector.createAutoChooser() comments for instructions");
     }
 
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // GAME AUTOS - Add your competition autonomous routines here!
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     // TODO: Create autonomous routines for current game (update each year)
     //
@@ -164,9 +164,9 @@ public class AutoSelector {
    * <p><b>UPDATE EACH YEAR:</b> Add game-specific commands here!
    */
   public static void registerNamedCommands() {
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // DEBUG COMMANDS - Useful for testing
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     NamedCommands.registerCommand(
       "Print Start",
@@ -178,9 +178,9 @@ public class AutoSelector {
       Commands.runOnce(() -> System.out.println("Auto complete!"))
     );
 
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // GAME-SPECIFIC NAMED COMMANDS - Add yours here!
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     // TODO: Register game-specific commands for use in PathPlanner autonomous
     //

@@ -9,9 +9,9 @@ import edu.wpi.first.math.util.Units;
  */
 public final class VisionConstants {
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // CAMERA IDENTIFICATION
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   public static final String kFrontCameraName = "front";
   public static final String kBackCameraName = "back";
@@ -20,9 +20,9 @@ public final class VisionConstants {
   @Deprecated
   public static final String kCameraName = kFrontCameraName;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // FRONT CAMERA POSITION (Robot-to-Camera Transform)
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // TODO: YOU MUST MEASURE THESE ON THE REAL ROBOT
   
   public static final double kFrontCameraToRobotX = 0.0; // Forward (+)
@@ -32,9 +32,9 @@ public final class VisionConstants {
   public static final double kFrontCameraYawRadians = 0.0;
   public static final double kFrontCameraRollRadians = 0.0;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // BACK CAMERA POSITION (Robot-to-Camera Transform)
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // TODO: YOU MUST MEASURE THESE ON THE REAL ROBOT
 
   public static final double kBackCameraToRobotX = 0.0; 
@@ -44,9 +44,9 @@ public final class VisionConstants {
   public static final double kBackCameraYawRadians = Math.PI; // Facing Backwards
   public static final double kBackCameraRollRadians = 0.0;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // LEGACY POSITION (Deprecated)
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   @Deprecated public static final double kCameraToRobotX = kFrontCameraToRobotX;
   @Deprecated public static final double kCameraToRobotY = kFrontCameraToRobotY;
   @Deprecated public static final double kCameraToRobotZ = kFrontCameraToRobotZ;
@@ -54,9 +54,9 @@ public final class VisionConstants {
   @Deprecated public static final double kCameraYawRadians = kFrontCameraYawRadians;
   @Deprecated public static final double kCameraRollRadians = kFrontCameraRollRadians;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // VISION QUALITY FILTERS
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /**
    * Max distance for SINGLE-tag detections (meters).
@@ -78,18 +78,18 @@ public final class VisionConstants {
    */
   public static final double kMaxLatencyMs = 50.0;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // VISION HEALTH & SAFETY
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   public static final int kMaxConsecutiveFailures = 10;
   public static final double kVisionStaleTimeoutSeconds = 2.0;
   public static final double kErrorLogIntervalSeconds = 5.0;
   public static final boolean kVerboseLogging = false;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // VISION TRUST (Standard Deviations) - THE "SECRET SAUCE"
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /**
    * Multi-tag high trust std dev - X/Y position (meters).

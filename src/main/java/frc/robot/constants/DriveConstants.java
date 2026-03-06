@@ -13,9 +13,9 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
  */
 public final class DriveConstants {
 
-  // ═════════════════════════════════════════════════════════════════════
+  // =====================================================================
   // DRIVE SPEEDS
-  // ═════════════════════════════════════════════════════════════════════
+  // =====================================================================
 
   /** Max drive speed in teleop (m/s). Tune for responsive but controllable driving. */
   public static final double kMaxSpeedMetersPerSecond = 4.8;
@@ -26,17 +26,17 @@ public final class DriveConstants {
   /** Default speed multiplier at startup (0.0 to 1.0). Robot starts at full speed. */
   public static final double kDefaultSpeedMultiplier = 1.0;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // KINEMATICS
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Swerve drive kinematics. Uses module positions from HardwareConstants. */
   public static final SwerveDriveKinematics kDriveKinematics =
       new SwerveDriveKinematics(HardwareConstants.kModuleTranslations);
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // ODOMETRY & VISION FUSION
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Odometry trust - X position (meters). Lower = trust encoders/gyro more. */
   public static final double kStateStdDevX = 0.1;
@@ -62,9 +62,9 @@ public final class DriveConstants {
   /** Vision baseline trust - Rotation (radians). Overridden per-frame based on quality. */
   public static final double kVisionStdDevTheta = 1.5;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // SAFETY THRESHOLDS
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Brownout voltage threshold (volts). Logs warning when battery drops below this. */
   public static final double kBrownoutVoltageThreshold = 6.5;
@@ -76,11 +76,11 @@ public final class DriveConstants {
   public static final double kVisionTimeoutSeconds = 2.0;
 
   /** Max age for vision measurements (seconds). Reject frames older than this. */
-  public static final double kMaxVisionMeasurementAgeSeconds = 0.5;
+  public static final double kMaxVisionMeasurementAgeSeconds = 1.5;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // VISION CORRECTION THRESHOLDS - Competition Mode vs Classroom Mode
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /**
    * COMPETITION MODE: Large vision correction threshold (meters).
@@ -134,9 +134,9 @@ public final class DriveConstants {
   /** No-trust vision std dev (meters/radians). So high that pose estimator ignores it. */
   public static final double kVisionNoTrustStdDev = 100.0;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // TELEOP CONTROL TUNING
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Joystick deadband (0.0 to 1.0). Prevents drift when stick is released. */
   public static final double kJoystickDeadband = 0.1;
@@ -194,9 +194,9 @@ public final class DriveConstants {
   /** Heading lock PID - D gain. Usually 0. */
   public static final double kHeadingLockD = 0.0;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // TELEOP PRESETS
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Full speed multiplier (100%). */
   public static final double kFullSpeedMultiplier = 1.0;
@@ -225,16 +225,16 @@ public final class DriveConstants {
   /** Diamond snap offset (degrees). 45° for NE/SE/SW/NW directions. */
   public static final double kDiamondSnapOffsetDegrees = 45.0;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // AUTONOMOUS
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Pathfinding goal end velocity (m/s). 0 = stop at destination. */
   public static final double kPathfindGoalEndVelocity = 0.0;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // TESTING
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Default test target X position (meters). Used for dashboard vision testing. */
   public static final double kDefaultTestTargetX = 2.0;

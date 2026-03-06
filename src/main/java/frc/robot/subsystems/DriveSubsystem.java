@@ -24,12 +24,12 @@ import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.constants.DriveConstants;
-import frc.robot.constants.FieldConstants;
 import frc.robot.constants.HardwareConstants;
 import edu.wpi.first.math.Matrix;
 
@@ -73,6 +73,43 @@ public class DriveSubsystem extends SubsystemBase {
     private double lastVisionUpdateTime = 0.0;
     private Pose2d latestVisionPose = new Pose2d();  // Latest raw vision estimate (for logging)
 
+    // =====================================================================══
+    // VISION REJECTION TRACKING - Debug why poses are filtered in DriveSubsystem
+    // =====================================================================══
+    private int rejectedGyroRateCount = 0;        // Spinning too fast
+    private int rejectedStaleCount = 0;           // Measurement too old
+    private int rejectedSingleTagDistCount = 0;   // Single-tag too far from odometry
+    private int acceptedMultiTagCount = 0;        // Multi-tag accepted
+    private int acceptedSingleTagCount = 0;       // Single-tag accepted
+
+    // =====================================================================══
+    // PPS (Poses Per Second) TRACKING - Measure vision throughput
+    // Uses exponential moving average for smooth display (no sawtooth!)
+    // =====================================================================══
+    private static final double PPS_SMOOTHING_FACTOR = 0.1; // Lower = smoother, higher = more responsive
+    private double smoothedReceivedPPS = 0;       // Exponential moving average of received PPS
+    private double smoothedAcceptedPPS = 0;       // Exponential moving average of accepted PPS
+    private double lastPPSUpdateTime = 0;         // Last time we updated PPS calculation
+    private int posesReceivedSinceLastUpdate = 0; // Accumulator between updates
+    private int posesAcceptedSinceLastUpdate = 0; // Accumulator between updates
+
+    // =====================================================================══
+    // SIMULATION SUPPORT - Encapsulated in SimDrivetrain for clean separation
+    // =====================================================================══
+    private SimDrivetrain simDrivetrain = null;   // Only created in simulation
+
+    // =====================================================================══
+    // PRE-ALLOCATED ARRAYS - Prevents GC pressure from repeated allocations
+    // =====================================================================══
+    private final SwerveModuleState[] measuredStates = new SwerveModuleState[4];
+    private final SwerveModulePosition[] modulePositionsReal = new SwerveModulePosition[4];
+    private final SwerveModulePosition[] modulePositionsSim = new SwerveModulePosition[] {
+        new SwerveModulePosition(0, new Rotation2d()),
+        new SwerveModulePosition(0, new Rotation2d()),
+        new SwerveModulePosition(0, new Rotation2d()),
+        new SwerveModulePosition(0, new Rotation2d())
+    };
+
     /**
      * @param vision The vision provider implementation (Real or Simulation).
      */
@@ -97,6 +134,16 @@ public class DriveSubsystem extends SubsystemBase {
             getRotation2d(),
             getModulePositions()
         );
+
+        // Initialize simulation support if not on real robot
+        if (!RobotBase.isReal()) {
+            simDrivetrain = new SimDrivetrain();
+
+            // Wire up SimVisionProvider to use SimDrivetrain's true pose
+            if (vision instanceof SimVisionProvider) {
+                ((SimVisionProvider) vision).setTruePoseSupplier(simDrivetrain::getTruePose);
+            }
+        }
 
         configurePathPlanner();
     }
@@ -135,9 +182,9 @@ public class DriveSubsystem extends SubsystemBase {
     }
 
     private void updateDashboard() {
-        // ═══════════════════════════════════════════════════════════════════════
+        // =====================================================================══
         // ADVANTAGEKIT LOGGING - Primary telemetry for AdvantageScope replay
-        // ═══════════════════════════════════════════════════════════════════════
+        // =====================================================================══
         //
         // All data logged here is available in AdvantageScope for post-match analysis.
         // NT4Publisher streams this to NetworkTables for live viewing.
@@ -150,11 +197,21 @@ public class DriveSubsystem extends SubsystemBase {
         //      - Odometry/OdometryOnly (BLUE) - Encoder-only, drifts over time
         //      - Vision/RobotPose (GREEN) - Latest vision estimate
         //
-        // ═══════════════════════════════════════════════════════════════════════
+        // =====================================================================══
 
         // --- POSE DATA (Primary for AdvantageScope 2D/3D Field) ---
+        // In simulation, we have 3 distinct poses to visualize:
+        //   - Robot (fused): What the robot "believes" - drifts, then corrected by vision
+        //   - OdometryOnly: Pure odometry - drifts continuously, never corrected
+        //   - TruePose: Ground truth - where robot ACTUALLY is (vision reports this)
+        //   - VisionPose: Latest vision estimate (should match TruePose when tags visible)
         Logger.recordOutput("Odometry/Robot", getCurrentPose());
-        Logger.recordOutput("Odometry/OdometryOnly", odometry.getPoseMeters());
+        if (simDrivetrain != null) {
+            Logger.recordOutput("Odometry/OdometryOnly", simDrivetrain.getOdometryPose());
+            Logger.recordOutput("Odometry/TruePose", simDrivetrain.getTruePose());
+        } else {
+            Logger.recordOutput("Odometry/OdometryOnly", odometry.getPoseMeters());
+        }
         Logger.recordOutput("Odometry/VisionPose", latestVisionPose);
 
         // --- APRILTAG TRACKING (3D poses for field visualization) ---
@@ -163,33 +220,19 @@ public class DriveSubsystem extends SubsystemBase {
         Logger.recordOutput("Odometry/AcceptedTags", vision.getAcceptedTagPoses());
         Logger.recordOutput("Odometry/RejectedTags", vision.getRejectedTagPoses());
 
-        // --- MODULE STATES (For swerve visualization) ---
-        Logger.recordOutput("Drive/MeasuredStates", new SwerveModuleState[] {
-            frontLeft.getState(), frontRight.getState(), rearLeft.getState(), rearRight.getState()
-        });
+        // --- MODULE STATES (For swerve visualization) --- Reuse pre-allocated array
+        measuredStates[0] = frontLeft.getState();
+        measuredStates[1] = frontRight.getState();
+        measuredStates[2] = rearLeft.getState();
+        measuredStates[3] = rearRight.getState();
+        Logger.recordOutput("Drive/MeasuredStates", measuredStates);
 
         // --- CHASSIS SPEEDS (For tuning/analysis) ---
         ChassisSpeeds speeds = getRobotRelativeSpeeds();
         Logger.recordOutput("Drive/MeasuredSpeeds", speeds);
 
-        // --- GYRO (For odometry debugging) ---
-        Logger.recordOutput("Gyro/Connected", gyro.isConnected());
+        // --- GYRO (Essential for odometry replay) ---
         Logger.recordOutput("Gyro/YawDeg", gyro.getYaw());
-        Logger.recordOutput("Gyro/RateDegPerSec", Math.toDegrees(gyro.getRate()));
-
-        // --- HUB DISTANCE (For shooter ranging) ---
-        var hubCenter = FieldConstants.getAllianceHubCenter();
-        double distanceToHubMeters = getCurrentPose().getTranslation().getDistance(hubCenter);
-        boolean inShootingRange = distanceToHubMeters >= FieldConstants.kMinShootingDistance
-                               && distanceToHubMeters <= FieldConstants.kMaxShootingDistance;
-
-        Logger.recordOutput("Hub/DistanceMeters", distanceToHubMeters);
-        Logger.recordOutput("Hub/InRange", inShootingRange);
-
-        // --- DRIVER SETTINGS ---
-        Logger.recordOutput("Drive/FieldRelative", fieldRelative);
-        Logger.recordOutput("Drive/SpeedMultiplier", speedMultiplier);
-        Logger.recordOutput("Drive/BatteryVoltage", RobotController.getBatteryVoltage());
     }
 
     /**
@@ -197,14 +240,36 @@ public class DriveSubsystem extends SubsystemBase {
      */
     private void processVisionMeasurements() {
         // Rejection 1: Spinning too fast causes camera motion blur
-        // (Even with global shutter, processing latency while spinning can cause lag)
-        if (Math.abs(gyro.getRate()) > DriveConstants.kMaxAngularVelocityForVisionDegPerSec) {
+        double gyroRate = Math.abs(gyro.getRate());
+        if (gyroRate > DriveConstants.kMaxAngularVelocityForVisionDegPerSec) {
+            rejectedGyroRateCount++;
             return;
         }
 
-        Pose2d currentEstimate = poseEstimator.getEstimatedPosition();
+        // Use getCurrentPose() which returns simPose in simulation
+        Pose2d currentEstimate = getCurrentPose();
         List<EstimatedRobotPose> visionEstimates = vision.getEstimatedGlobalPoses(currentEstimate);
         double currentTime = Timer.getFPGATimestamp();
+
+        // Count poses RECEIVED from PhotonVision (before any DriveSubsystem filtering)
+        posesReceivedSinceLastUpdate += visionEstimates.size();
+
+        // PPS tracking: Update exponential moving average every 0.1 seconds (10 Hz update rate)
+        double timeSinceLastUpdate = currentTime - lastPPSUpdateTime;
+        if (timeSinceLastUpdate >= 0.1) {
+            // Calculate instantaneous PPS based on counts since last update
+            double instantReceivedPPS = posesReceivedSinceLastUpdate / timeSinceLastUpdate;
+            double instantAcceptedPPS = posesAcceptedSinceLastUpdate / timeSinceLastUpdate;
+
+            // Apply exponential moving average for smooth display
+            smoothedReceivedPPS = PPS_SMOOTHING_FACTOR * instantReceivedPPS + (1.0 - PPS_SMOOTHING_FACTOR) * smoothedReceivedPPS;
+            smoothedAcceptedPPS = PPS_SMOOTHING_FACTOR * instantAcceptedPPS + (1.0 - PPS_SMOOTHING_FACTOR) * smoothedAcceptedPPS;
+
+            // Reset accumulators
+            posesReceivedSinceLastUpdate = 0;
+            posesAcceptedSinceLastUpdate = 0;
+            lastPPSUpdateTime = currentTime;
+        }
 
         if (!visionEstimates.isEmpty()) {
             lastVisionUpdateTime = currentTime;
@@ -220,7 +285,8 @@ public class DriveSubsystem extends SubsystemBase {
             // Rejection 2: Stale measurement - image is too old to be useful
             double measurementAge = currentTime - est.timestampSeconds;
             if (measurementAge > DriveConstants.kMaxVisionMeasurementAgeSeconds) {
-                continue; // Skip this stale frame
+                rejectedStaleCount++;
+                continue;
             }
 
             Pose2d estPose = est.estimatedPose.toPose2d();
@@ -233,46 +299,63 @@ public class DriveSubsystem extends SubsystemBase {
             Matrix<N3, N1> stdDevs = vision.getEstimationStdDevs(est);
 
             if (multiTag) {
-                // Multi-tag: extremely reliable, even at range.
-                // However, if the pose jumps wildly (e.g. 2 meters), we still treat it with caution
-                // unless we are in the "Large Threshold" logic (like a reset).
+                // Multi-tag: extremely reliable, even at range
                 poseEstimator.addVisionMeasurement(estPose, est.timestampSeconds, stdDevs);
+                acceptedMultiTagCount++;
+                posesAcceptedSinceLastUpdate++;
 
+                if (simDrivetrain != null) {
+                    simDrivetrain.applyVisionCorrection(estPose, 0.8);
+                }
             } else {
-                // Single Tag Logic:
-                // Only accept single tag updates if they are relatively close to where we think we are.
-                // This prevents "teleporting" to the other side of the field due to a false ID detection.
+                // Single Tag: Only accept if close to current odometry estimate
                 if (distanceDiff < smallThreshold) {
                     poseEstimator.addVisionMeasurement(estPose, est.timestampSeconds, stdDevs);
+                    acceptedSingleTagCount++;
+                    posesAcceptedSinceLastUpdate++;
+
+                    if (simDrivetrain != null) {
+                        simDrivetrain.applyVisionCorrection(estPose, 0.5);
+                    }
+                } else {
+                    rejectedSingleTagDistCount++;
                 }
-                // If distanceDiff is large > smallThreshold, we ignore single-tag data.
-                // It's too risky to let a single tag reset our field position by a large amount.
             }
         }
+
+        // Log summary stats every cycle
+        logVisionDebugSummary();
+    }
+
+    /**
+     * Logs PPS (Poses Per Second) - the key metric for vision throughput.
+     */
+    private void logVisionDebugSummary() {
+        // PPS metrics only - essential for debugging throughput issues
+        Logger.recordOutput("Vision/PPS/Received", smoothedReceivedPPS);
+        Logger.recordOutput("Vision/PPS/Accepted", smoothedAcceptedPPS);
     }
 
     /**
      * Drives the robot.
      *
-     * @param xSpeed Forward velocity (meters/second).
-     * @param ySpeed Sideways velocity (meters/second).
+     * @param xSpeed Forward velocity (meters/second). Field-relative if fieldRelative=true.
+     * @param ySpeed Sideways velocity (meters/second). Field-relative if fieldRelative=true.
      * @param rot Angular velocity (radians/second).
      * @param fieldRelative True for field-oriented control, false for robot-oriented.
      */
     public void drive(double xSpeed, double ySpeed, double rot, boolean fieldRelative) {
+        // Store RAW inputs for simulation (before any conversion)
+        if (simDrivetrain != null) {
+            simDrivetrain.setInputs(xSpeed, ySpeed, rot, fieldRelative);
+        }
+
         ChassisSpeeds speeds = fieldRelative
             ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rot, getRotation2d())
             : new ChassisSpeeds(xSpeed, ySpeed, rot);
 
         SwerveModuleState[] states = DriveConstants.kDriveKinematics.toSwerveModuleStates(speeds);
         SwerveDriveKinematics.desaturateWheelSpeeds(states, DriveConstants.kMaxSpeedMetersPerSecond);
-
-        // Log desired states for replay comparison (what we're commanding vs what happened)
-        Logger.recordOutput("Drive/DesiredSpeeds/vx", speeds.vxMetersPerSecond);
-        Logger.recordOutput("Drive/DesiredSpeeds/vy", speeds.vyMetersPerSecond);
-        Logger.recordOutput("Drive/DesiredSpeeds/omega", speeds.omegaRadiansPerSecond);
-        Logger.recordOutput("Drive/DesiredStates", states);
-
         setModuleStates(states);
     }
 
@@ -296,14 +379,17 @@ public class DriveSubsystem extends SubsystemBase {
         rearRight.setBrakeMode(shouldBrake);
     }
 
-    /** Returns the fused pose (Odometry + Vision). */
+    /** Returns the fused pose (Odometry + Vision). In simulation, returns simulated pose. */
     public Pose2d getCurrentPose() {
+        if (simDrivetrain != null) {
+            return simDrivetrain.getPose();
+        }
         return poseEstimator.getEstimatedPosition();
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // =====================================================================══════
     // POSE RESET METHODS
-    // ═══════════════════════════════════════════════════════════════════════════
+    // =====================================================================══════
     //
     // All resets sync the three pose trackers (fused, odometry, vision) so they
     // agree in AdvantageScope. Use the appropriate method for your situation:
@@ -314,7 +400,7 @@ public class DriveSubsystem extends SubsystemBase {
     //   resetPose(pose)    - Robot is at a known field position
     //   resetToOrigin()    - Testing/calibration at (0,0,0)
     //
-    // ═══════════════════════════════════════════════════════════════════════════
+    // =====================================================================══════
 
     /**
      * Resets all pose tracking to a known field position.
@@ -324,6 +410,11 @@ public class DriveSubsystem extends SubsystemBase {
      * @param pose The known field position
      */
     public void resetPose(Pose2d pose) {
+        // In simulation, also reset the sim pose
+        if (simDrivetrain != null) {
+            simDrivetrain.resetPose(pose);
+        }
+
         Rotation2d gyroAngle = getRotation2d();
         poseEstimator.resetPosition(gyroAngle, getModulePositions(), pose);
         odometry.resetPosition(gyroAngle, getModulePositions(), pose);
@@ -374,6 +465,7 @@ public class DriveSubsystem extends SubsystemBase {
      * Preserves the current X/Y position.
      */
     public void zeroHeading() {
+        System.out.println("Zero HEADING");
         setHeading(new Rotation2d()); // 0 degrees
     }
 
@@ -415,8 +507,14 @@ public class DriveSubsystem extends SubsystemBase {
      * Also zeros the gyro. Use for testing/calibration.
      */
     public void resetToOrigin() {
-        gyro.reset();
         Pose2d origin = new Pose2d();
+
+        // In simulation, reset the sim pose; on real robot, reset gyro
+        if (simDrivetrain != null) {
+            simDrivetrain.resetPose(origin);
+        } else {
+            gyro.reset();
+        }
 
         poseEstimator.resetPosition(new Rotation2d(), getModulePositions(), origin);
         odometry.resetPosition(new Rotation2d(), getModulePositions(), origin);
@@ -444,9 +542,13 @@ public class DriveSubsystem extends SubsystemBase {
     /**
      * Returns the robot's rotation.
      * Note: Negated because NavX is CW+ but WPILib requires CCW+.
+     * In simulation, returns the simulated gyro angle.
      */
     public Rotation2d getRotation2d() {
-        return gyro.isConnected() ? Rotation2d.fromDegrees(-gyro.getAngle()) : new Rotation2d();
+        if (simDrivetrain != null) {
+            return simDrivetrain.getRotation2d();
+        }
+        return gyro.isConnected() ? Rotation2d.fromDegrees(-1*gyro.getAngle()) : new Rotation2d();
     }
 
     /** Returns current heading in degrees (-inf to +inf). */
@@ -465,10 +567,17 @@ public class DriveSubsystem extends SubsystemBase {
     }
 
     public SwerveModulePosition[] getModulePositions() {
-        return new SwerveModulePosition[] {
-            frontLeft.getPosition(), frontRight.getPosition(),
-            rearLeft.getPosition(), rearRight.getPosition()
-        };
+        // In simulation, we use simDrivetrain.getPose() directly via getCurrentPose(),
+        // so module positions are not critical. Return pre-allocated zeros to avoid GC.
+        if (simDrivetrain != null) {
+            return modulePositionsSim;
+        }
+        // Reuse pre-allocated array to avoid GC pressure
+        modulePositionsReal[0] = frontLeft.getPosition();
+        modulePositionsReal[1] = frontRight.getPosition();
+        modulePositionsReal[2] = rearLeft.getPosition();
+        modulePositionsReal[3] = rearRight.getPosition();
+        return modulePositionsReal;
     }
 
     /** Returns current speeds relative to the robot frame. */
@@ -543,5 +652,31 @@ public class DriveSubsystem extends SubsystemBase {
             },
             this
         );
+    }
+
+    // =====================================================================══
+    // SIMULATION SUPPORT
+    // =====================================================================══
+
+    /**
+     * Updates simulation physics. Call this from Robot.simulationPeriodic().
+     *
+     * <p>Delegates to SimDrivetrain which handles all physics simulation.
+     * The SimDrivetrain uses raw drive inputs (stored via setInputs() in drive())
+     * to update the simulated robot pose.
+     */
+    public void simulationPeriodic() {
+        if (simDrivetrain != null) {
+            simDrivetrain.update();
+        }
+    }
+
+        public void moveOneWheel() {
+        setModuleStates(new SwerveModuleState[] {
+            new SwerveModuleState(5, Rotation2d.fromDegrees(0)),
+            new SwerveModuleState(0, Rotation2d.fromDegrees(0)),
+            new SwerveModuleState(0, Rotation2d.fromDegrees(0)),
+            new SwerveModuleState(0, Rotation2d.fromDegrees(0))
+        });
     }
 }

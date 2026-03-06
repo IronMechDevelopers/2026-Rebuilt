@@ -59,6 +59,7 @@
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+replay_pid*
 
 ### Linux ###
 *~
@@ -103,16 +104,15 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-### VisualStudioCode ###
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+# macOS text editor temp files
+*.swp
+*.swo
+*~
 
 ### Windows ###
 # Windows thumbnail cache files
 Thumbs.db
+Thumbs.db:encryptable
 ehthumbs.db
 ehthumbs_vista.db
 
@@ -134,6 +134,18 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+# Windows temp files
+*.tmp
+*.temp
+
+### VisualStudioCode ###
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
 
 ### Gradle ###
 .gradle
@@ -168,6 +180,17 @@ out/
 # Fleet
 .fleet
 
+# Eclipse
+.metadata
+*.launch
+.buildpath
+
+# NetBeans
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+
 # Simulation GUI and other tools window save file
 networktables.json
 simgui.json
@@ -191,9 +214,57 @@ compile_commands.json
 # AdvantageKit log files
 *.wpilog
 *.rlog
+*.hoot
 
 # Deploy cache
 .deploy/
+
+# Robot deploy artifacts
+.shuffleboard/
+
+# PathPlanner saved states
+.pathplanner/
+
+# PhotonVision configs (team-specific - consider if you want to ignore)
+photonvision_config/
+
+# Glass save file
+glass.json
+
+# FRC Driver Station logs
+FRC_*.zip
+
+# NetworkTables persistence
+networktables.ini
+networktables.ini.bak
+
+# Robot program crash dumps
+core
+hs_err_pid*.log
+
+# Vendor library cache
+vendordeps/.cache/
+
+### General Dev ###
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+*~
+
+# Editor swap files
+*.swp
+*.swo
+*.swn
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+tmp/
+temp/
 
 ### Claude Code ###
 .claude/

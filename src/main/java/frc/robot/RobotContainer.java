@@ -14,6 +14,7 @@ import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.CommandPS5Controller;
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.commands.DriveCommands;
 import frc.robot.config.AutoSelector;
 import frc.robot.config.ButtonBindings;
@@ -22,16 +23,15 @@ import frc.robot.config.SubsystemSetup;
 import frc.robot.config.VisionSetup;
 import frc.robot.constants.DriveConstants;
 import frc.robot.constants.HardwareConstants;
+import frc.robot.subsystems.CANFuelSubsystem;
 import frc.robot.subsystems.DriveSubsystem;
 import frc.robot.subsystems.MatchStateTracker;
 import frc.robot.subsystems.VisionProvider;
-import frc.robot.subsystems.led.LEDSubsystem;
-import frc.robot.subsystems.led.REVBlinkController;
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * =====================================================================══════
  *                           ROBOT CONTAINER
- * ═══════════════════════════════════════════════════════════════════════════
+ * =====================================================================══════
  *
  * This file wires everything together. It's the "main" setup for the robot.
  *
@@ -54,34 +54,24 @@ import frc.robot.subsystems.led.REVBlinkController;
  */
 public class RobotContainer {
 
-  // =========================================================================
   // SUBSYSTEMS
-  // =========================================================================
 
-  /** Vision provider - Created by VisionSetup */
+  /** Vision provider - Created by VisionSetup (uses SimVisionProvider in simulation) */
   private final VisionProvider vision = VisionSetup.createVisionProvider();
 
   /** Drive subsystem - Created by SubsystemSetup */
   private final DriveSubsystem drive = SubsystemSetup.createDriveSubsystem(vision);
 
+  private final CANFuelSubsystem ballSubsystem = new CANFuelSubsystem();
+
   /** Match state tracker - Tracks hub status and shift timing for 2026 REBUILT */
   private final MatchStateTracker matchState = new MatchStateTracker();
 
-  /** LED subsystem - Communicates match state visually to drive team */
-  private final LEDSubsystem leds = new LEDSubsystem(
-      new REVBlinkController(HardwareConstants.kLEDControllerPWMPort),
-      matchState
-  );
 
-  // =========================================================================
   // CONTROLLERS
-  // =========================================================================
 
   /** Driver left joystick (Thrustmaster) - Translation control */
-  private final Joystick driverLeftStick = new Joystick(HardwareConstants.kDriverLeftJoystickPort);
-
-  /** Driver right joystick (Thrustmaster) - Rotation control */
-  private final Joystick driverRightStick = new Joystick(HardwareConstants.kDriverRightJoystickPort);
+  private final CommandXboxController driver = new CommandXboxController(HardwareConstants.kDriverControllerPort);
 
   /** Co-driver PlayStation controller */
   private final CommandPS5Controller coDriver = new CommandPS5Controller(HardwareConstants.kCoDriverControllerPort);
@@ -115,58 +105,58 @@ public class RobotContainer {
    * Creates robot container and configures everything.
    */
   public RobotContainer() {
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // STEP 1: Register PathPlanner named commands (MUST be first!)
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     AutoSelector.registerNamedCommands();
 
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // STEP 2: Create auto selector
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     autoSelector = new AutoSelector();
 
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // STEP 3: Set default drive command
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     drive.setDefaultCommand(
       DriveCommands.joystickDrive(
         drive,
-        () -> -driverLeftStick.getY(),   // Forward/backward
-        () -> -driverLeftStick.getX(),   // Left/right
-        () -> -driverRightStick.getX()   // Rotation
+        () -> -driver.getLeftY(),   // Forward/backward
+        () -> -driver.getLeftX(),   // Left/right
+        () -> -driver.getRightX()   // Rotation
       )
     );
 
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // STEP 4: Configure button bindings (see config/ButtonBindings.java)
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     ButtonBindings buttonBindings = new ButtonBindings(
         drive,
-        driverLeftStick,
-        driverRightStick,
+        ballSubsystem,
+        driver,
         coDriver,
         this::getTestTarget,
         this::setTestTarget
     );
     buttonBindings.configureAll();
 
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // STEP 5: Configure dashboard (see config/DashboardSetup.java)
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     dashboardSetup = new DashboardSetup(drive, matchState, autoSelector.getChooser());
     dashboardSetup.configureAll();
 
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // STEP 6: Publish test target to dashboard
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     SmartDashboard.putNumber("Test/TargetX", testTarget.getX());
     SmartDashboard.putNumber("Test/TargetY", testTarget.getY());
     SmartDashboard.putNumber("Test/TargetHeading", testTarget.getRotation().getDegrees());
     SmartDashboard.putNumber("Test/DistanceFromTag", DriveConstants.kDefaultDistanceFromTag);
 
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     // STEP 7: Initialize vision mode
-    // ═════════════════════════════════════════════════════════════════════
+    // =====================================================================
     SmartDashboard.setDefaultBoolean("Vision/ClassroomMode", false);
   }
 
@@ -202,15 +192,6 @@ public class RobotContainer {
   }
 
   /**
-   * Gets LED subsystem instance.
-   *
-   * @return LED subsystem
-   */
-  public LEDSubsystem getLEDSubsystem() {
-    return leds;
-  }
-
-  /**
    * Updates dashboard periodic tasks.
    * Call this from Robot.robotPeriodic().
    */
@@ -221,6 +202,14 @@ public class RobotContainer {
 
     // Log inputs and match context for AdvantageScope replay
     logInputsAndContext();
+  }
+
+  /**
+   * Updates simulation physics.
+   * Call this from Robot.simulationPeriodic().
+   */
+  public void simulationPeriodic() {
+    drive.simulationPeriodic();
   }
 
   // =========================================================================
@@ -237,36 +226,16 @@ public class RobotContainer {
   //   - CAN/* shows hardware bus health
   //
   private void logInputsAndContext() {
-    // ═══════════════════════════════════════════════════════════════════════
+    // =====================================================================══
     // DRIVER INPUTS - Critical for replay!
-    // ═══════════════════════════════════════════════════════════════════════
+    // =====================================================================══
     // These are the raw joystick values BEFORE deadband/processing
     // Essential for replaying exactly what the driver did
 
-    Logger.recordOutput("Inputs/DriverLeftY", driverLeftStick.getY());
-    Logger.recordOutput("Inputs/DriverLeftX", driverLeftStick.getX());
-    Logger.recordOutput("Inputs/DriverRightX", driverRightStick.getX());
-    Logger.recordOutput("Inputs/DriverRightY", driverRightStick.getY());
 
-    // Log button states as a bitmask for compactness
-    int leftButtons = 0;
-    int rightButtons = 0;
-    for (int i = 1; i <= 12; i++) {
-      if (driverLeftStick.getRawButton(i)) leftButtons |= (1 << i);
-      if (driverRightStick.getRawButton(i)) rightButtons |= (1 << i);
-    }
-    Logger.recordOutput("Inputs/DriverLeftButtons", leftButtons);
-    Logger.recordOutput("Inputs/DriverRightButtons", rightButtons);
-
-    // Co-driver inputs
-    Logger.recordOutput("Inputs/CoDriverLeftX", coDriver.getLeftX());
-    Logger.recordOutput("Inputs/CoDriverLeftY", coDriver.getLeftY());
-    Logger.recordOutput("Inputs/CoDriverRightX", coDriver.getRightX());
-    Logger.recordOutput("Inputs/CoDriverRightY", coDriver.getRightY());
-
-    // ═══════════════════════════════════════════════════════════════════════
+    // =====================================================================══
     // MATCH CONTEXT - Know when things happened
-    // ═══════════════════════════════════════════════════════════════════════
+    // =====================================================================══
 
     Logger.recordOutput("Match/TimeRemaining", DriverStation.getMatchTime());
     Logger.recordOutput("Match/IsEnabled", DriverStation.isEnabled());
@@ -281,9 +250,9 @@ public class RobotContainer {
     Logger.recordOutput("Match/MatchNumber", DriverStation.getMatchNumber());
     Logger.recordOutput("Match/EventName", DriverStation.getEventName());
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // =====================================================================══
     // COMMAND STATE - Know what code was running
-    // ═══════════════════════════════════════════════════════════════════════
+    // =====================================================================══
 
     // Log the current command running on the drive subsystem
     Command currentDriveCommand = drive.getCurrentCommand();
@@ -293,9 +262,9 @@ public class RobotContainer {
         currentDriveCommand != null &&
         currentDriveCommand.equals(drive.getDefaultCommand()));
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // =====================================================================══
     // CAN BUS HEALTH - Catch hardware issues
-    // ═══════════════════════════════════════════════════════════════════════
+    // =====================================================================══
 
     var canStatus = RobotController.getCANStatus();
     Logger.recordOutput("CAN/PercentUtilization", canStatus.percentBusUtilization);

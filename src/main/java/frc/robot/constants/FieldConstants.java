@@ -20,9 +20,9 @@ import edu.wpi.first.wpilibj.DriverStation.Alliance;
  */
 public final class FieldConstants {
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // FIELD DIMENSIONS (Standard for all FRC fields)
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Field length (meters) - Blue alliance wall to Red alliance wall. */
   public static final double kFieldLength = 16.54175;
@@ -30,9 +30,9 @@ public final class FieldConstants {
   /** Field width (meters) - Driver station wall to opposite wall. */
   public static final double kFieldWidth = 8.0137;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // HUB POSITIONS - Center of the 8 AprilTags surrounding each hub
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   //
   // Calculated from AprilTag positions (averaged from 8 tags per hub):
   //
@@ -89,22 +89,22 @@ public final class FieldConstants {
     return kBlueHubPose;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // SHOOTING RANGE CONSTANTS
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Minimum distance from hub for reliable shooting (meters). */
-  public static final double kMinShootingDistance = 1.5;
+  public static final double kMinShootingDistance = Units.feetToMeters(1);
 
   /** Maximum distance from hub for reliable shooting (meters). */
-  public static final double kMaxShootingDistance = 5.0;
+  public static final double kMaxShootingDistance = Units.feetToMeters(10);
 
   /** Optimal shooting distance from hub (meters). */
-  public static final double kOptimalShootingDistance = 3.0;
+  public static final double kOptimalShootingDistance = Units.feetToMeters(4);
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // BLUE ALLIANCE SCORING POSITIONS
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // TODO: Replace with actual game scoring locations
 
   /** Example scoring position - Left. */
@@ -119,9 +119,9 @@ public final class FieldConstants {
   /** Example secondary scoring location. */
   public static final Pose2d kBlueSecondaryScoring = new Pose2d(1.5, 7.0, Rotation2d.fromDegrees(-90));
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // RED ALLIANCE SCORING POSITIONS (mirrored from blue)
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // TODO: Update to match blue alliance positions (mirrored across field centerline)
 
   /** Example scoring position - Left (mirrored from blue). */
@@ -136,9 +136,9 @@ public final class FieldConstants {
   /** Example secondary scoring location (mirrored from blue). */
   public static final Pose2d kRedSecondaryScoring = new Pose2d(15.0, 7.0, Rotation2d.fromDegrees(90));
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // SCORING DISTANCE OFFSETS
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // TODO: Update based on robot dimensions and game requirements
 
   /**

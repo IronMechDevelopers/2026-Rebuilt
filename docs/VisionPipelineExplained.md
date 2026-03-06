@@ -243,7 +243,7 @@ Here's the step-by-step flow of how vision data becomes robot position:
 └─────────────────────────────────────────────────────────────────────────────┘
 
 STEP 1: CAMERA CAPTURES IMAGE
-════════════════════════════════════════════════════════════════════════════════
+=====================================================================═══════════
     Your OV9281 camera takes a picture (60-90 times per second)
     Global shutter means no motion blur distortion
 
@@ -251,7 +251,7 @@ STEP 1: CAMERA CAPTURES IMAGE
 
 
 STEP 2: PHOTONVISION PROCESSES (on Raspberry Pi)
-════════════════════════════════════════════════════════════════════════════════
+=====================================================================═══════════
     PhotonVision software finds AprilTags in the image
 
     For each tag found, it calculates:
@@ -265,7 +265,7 @@ STEP 2: PHOTONVISION PROCESSES (on Raspberry Pi)
 
 
 STEP 3: DATA SENT TO ROBORIO (NetworkTables)
-════════════════════════════════════════════════════════════════════════════════
+=====================================================================═══════════
     PhotonVision publishes results over the network
     Your robot code reads them via PhotonCamera class
 
@@ -274,7 +274,7 @@ STEP 3: DATA SENT TO ROBORIO (NetworkTables)
 
 
 STEP 4: PHOTONPOSEESTIMATOR CALCULATES ROBOT POSITION
-════════════════════════════════════════════════════════════════════════════════
+=====================================================================═══════════
     Uses three pieces of information:
 
     A) Where is the tag on the field?
@@ -303,7 +303,7 @@ STEP 4: PHOTONPOSEESTIMATOR CALCULATES ROBOT POSITION
 
 
 STEP 5: YOUR CODE FILTERS THE RESULT
-════════════════════════════════════════════════════════════════════════════════
+=====================================================================═══════════
     Not every detection should be trusted!
 
     Checks performed:
@@ -319,7 +319,7 @@ STEP 5: YOUR CODE FILTERS THE RESULT
 
 
 STEP 6: POSE ESTIMATOR FUSES VISION + ODOMETRY
-════════════════════════════════════════════════════════════════════════════════
+=====================================================================═══════════
     SwerveDrivePoseEstimator combines:
 
     ┌─────────────┐     ┌─────────────┐
@@ -351,7 +351,7 @@ STEP 6: POSE ESTIMATOR FUSES VISION + ODOMETRY
 
 
 STEP 7: ROBOT USES THE POSITION
-════════════════════════════════════════════════════════════════════════════════
+=====================================================================═══════════
     The fused position is used by:
     ├── PathPlanner (autonomous driving)
     ├── Auto-aim commands (rotation to face targets)
@@ -472,7 +472,7 @@ Here's what happens during a typical autonomous period:
 
 ```
 TIME 0.0s: MATCH STARTS
-═══════════════════════════════════════════════════════════════════════
+=====================================================================══
     Odometry:  (1.50, 5.00)  ← Starting position (set in code)
     Vision:    No tags visible yet (robot facing wrong way)
 
@@ -480,7 +480,7 @@ TIME 0.0s: MATCH STARTS
 
 
 TIME 0.5s: ROBOT MOVES, SEES 2 APRILTAGS
-═══════════════════════════════════════════════════════════════════════
+=====================================================================══
     Odometry:  (2.30, 4.80)  ← Wheels say we moved here
     Vision:    (2.40, 4.90)  ← Multi-tag detection
 
@@ -493,7 +493,7 @@ TIME 0.5s: ROBOT MOVES, SEES 2 APRILTAGS
 
 
 TIME 1.0s: ROBOT TURNS FAST (400°/sec)
-═══════════════════════════════════════════════════════════════════════
+=====================================================================══
     Odometry:  (3.00, 4.50)
     Vision:    REJECTED - Angular velocity > 720°/sec threshold
                (Actually it's 400, but this is an example of rejection)
@@ -503,7 +503,7 @@ TIME 1.0s: ROBOT TURNS FAST (400°/sec)
 
 
 TIME 1.5s: ROBOT SLOWS, SEES 1 APRILTAG
-═══════════════════════════════════════════════════════════════════════
+=====================================================================══
     Odometry:  (3.50, 4.20)  ← Has drifted from earlier spin
     Vision:    (3.60, 4.00)  ← Single tag, ambiguity = 0.15 (OK!)
 
@@ -516,7 +516,7 @@ TIME 1.5s: ROBOT SLOWS, SEES 1 APRILTAG
 
 
 TIME 2.0s: SEES TAG WITH HIGH AMBIGUITY
-═══════════════════════════════════════════════════════════════════════
+=====================================================================══
     Odometry:  (4.00, 3.80)
     Vision:    Ambiguity = 0.35 (> 0.2 threshold)
 
@@ -525,7 +525,7 @@ TIME 2.0s: SEES TAG WITH HIGH AMBIGUITY
 
 
 TIME 2.5s: ARRIVES AT SCORING POSITION, SEES 3 TAGS
-═══════════════════════════════════════════════════════════════════════
+=====================================================================══
     Odometry:  (4.45, 3.55)  ← Accumulated some drift
     Vision:    (4.50, 3.50)  ← Multi-tag, very accurate
 

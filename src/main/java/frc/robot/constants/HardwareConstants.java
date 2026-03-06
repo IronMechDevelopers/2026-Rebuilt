@@ -13,9 +13,9 @@ import edu.wpi.first.math.util.Units;
  */
 public final class HardwareConstants {
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // ROBOT PHYSICAL DIMENSIONS
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Distance between left and right wheels (meters). Default: 29 inches for MAXSwerve. */
   public static final double kTrackWidth = Units.inchesToMeters(29);
@@ -31,9 +31,9 @@ public final class HardwareConstants {
       new Translation2d(-kWheelBase / 2, -kTrackWidth / 2)  // Rear Right
   };
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // CAN IDs
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Front-left driving motor CAN ID. */
   public static final int kFrontLeftDrivingCanId = 10;
@@ -59,9 +59,9 @@ public final class HardwareConstants {
   /** Rear-left turning motor CAN ID. */
   public static final int kRearLeftTurningCanId = 41;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // SWERVE MODULE ANGULAR OFFSETS
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Front-left chassis angular offset (radians). Calibrate with bevel gear facing left. */
   public static final double kFrontLeftChassisAngularOffset = -Math.PI / 2;
@@ -75,9 +75,9 @@ public final class HardwareConstants {
   /** Rear-right chassis angular offset (radians). Calibrate with bevel gear facing right. */
   public static final double kBackRightChassisAngularOffset = Math.PI / 2;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // MOTOR SPECIFICATIONS
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** NEO motor free speed (RPM). */
   public static final double kNeoFreeSpeedRpm = 5676;
@@ -91,9 +91,9 @@ public final class HardwareConstants {
   /** Driving motor gear reduction. Formula: (45 × 22) / (pinionTeeth × 15) */
   public static final double kDrivingMotorReduction = (45.0 * 22) / (kDrivingMotorPinionTeeth * 15);
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // MOTOR CONFIGURATION
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Driving motor current limit (amps). Prevents brownouts and motor overheating. */
   public static final int kDrivingMotorCurrentLimit = 50;
@@ -119,29 +119,27 @@ public final class HardwareConstants {
   /** Turning motor PID - Derivative gain. Usually 0 for position control. */
   public static final double kTurningD = 0.0;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // OPERATOR INTERFACE
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
-  /** Left joystick USB port (translation control). */
-  public static final int kDriverLeftJoystickPort = 0;
 
-  /** Right joystick USB port (rotation control). */
-  public static final int kDriverRightJoystickPort = 1;
+  /** Driver controller USB port. */
+  public static final int kDriverControllerPort = 0;
 
   /** Co-driver controller USB port. */
-  public static final int kCoDriverControllerPort = 2;
+  public static final int kCoDriverControllerPort = 1;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // LED CONTROLLER
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** REV Blink LED controller PWM port. */
   public static final int kLEDControllerPWMPort = 9;
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
   // DERIVED CONSTANTS (Auto-calculated)
-  // ═══════════════════════════════════════════════════════════════════════
+  // =====================================================================══
 
   /** Wheel circumference (meters). Auto-calculated from diameter. */
   public static final double kWheelCircumferenceMeters = kWheelDiameterMeters * Math.PI;

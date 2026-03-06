@@ -28,9 +28,7 @@ public class Robot extends LoggedRobot {
    * initialization code.
    */
   public Robot() {
-    // ═══════════════════════════════════════════════════════════════════════
     // ADVANTAGEKIT LOGGER SETUP
-    // ═══════════════════════════════════════════════════════════════════════
 
     // Record metadata
     // TODO: Update these values when cloning template for new season
@@ -40,18 +38,14 @@ public class Robot extends LoggedRobot {
     Logger.recordMetadata("RobotType", "Swerve Drive");
 
     if (isReal()) {
-      // ═════════════════════════════════════════════════════════════════════
       // REAL ROBOT MODE - Log to USB stick and NetworkTables
-      // ═════════════════════════════════════════════════════════════════════
       // Logs saved to: /U/logs/ (USB stick)
       // Also streams to AdvantageScope via NetworkTables for live viewing
       Logger.addDataReceiver(new WPILOGWriter()); // Log to USB
       Logger.addDataReceiver(new NT4Publisher()); // Stream to NetworkTables
 
     } else {
-      // ═════════════════════════════════════════════════════════════════════
       // SIMULATION MODE - Just stream to NetworkTables (no blocking prompt)
-      // ═════════════════════════════════════════════════════════════════════
       // Note: For replay, use AdvantageScope to open a log file directly
       // or set AKIT_LOG_PATH environment variable before launching
       Logger.addDataReceiver(new NT4Publisher());
@@ -89,7 +83,8 @@ public class Robot extends LoggedRobot {
   public void disabledInit() {}
 
   @Override
-  public void disabledPeriodic() {}
+  public void disabledPeriodic() {
+  }
 
   /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
   @Override
@@ -137,5 +132,8 @@ public class Robot extends LoggedRobot {
 
   /** This function is called periodically whilst in simulation. */
   @Override
-  public void simulationPeriodic() {}
+  public void simulationPeriodic() {
+    // Update drivetrain physics simulation
+    robotContainer.simulationPeriodic();
+  }
 }
