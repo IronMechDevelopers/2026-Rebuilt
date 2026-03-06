@@ -4,11 +4,17 @@
 
 package frc.robot.config;
 
+import java.util.Set;
+
 import com.pathplanner.lib.auto.NamedCommands;
 import com.pathplanner.lib.commands.PathPlannerAuto;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import frc.robot.subsystems.DriveSubsystem;
+import frc.robot.subsystems.CANFuelSubsystem;
 
 /**
  * =====================================================================══════
@@ -38,6 +44,12 @@ public class AutoSelector {
   /** The chooser that appears on the dashboard */
   private final SendableChooser<Command> autoChooser;
 
+  /** Drive subsystem for simple autos */
+  private final DriveSubsystem drive;
+
+  /** Fuel subsystem for simple autos */
+  private final CANFuelSubsystem fuel;
+
   // =========================================================================
   // CONSTRUCTOR
   // =========================================================================
@@ -46,8 +58,13 @@ public class AutoSelector {
    * Creates the auto selector.
    *
    * <p>IMPORTANT: Call registerNamedCommands() BEFORE creating this!
+   *
+   * @param drive Drive subsystem for command-based autos
+   * @param fuel Fuel subsystem for command-based autos
    */
-  public AutoSelector() {
+  public AutoSelector(DriveSubsystem drive, CANFuelSubsystem fuel) {
+    this.drive = drive;
+    this.fuel = fuel;
     this.autoChooser = createAutoChooser();
   }
 
@@ -109,36 +126,125 @@ public class AutoSelector {
     chooser.setDefaultOption("None", null);
 
     // =====================================================================
-    // TEST AUTOS - Safe, simple paths for verifying PathPlanner works
+    // TEST AUTOS - PathPlanner test paths (disabled until paths are created)
     // =====================================================================
 
-    try {
-      // Test Auto 1: Simple straight line (2 meters forward)
-      // Purpose: Verify basic path following, encoders, and gyro
-      chooser.addOption("Test: Drive Forward", new PathPlannerAuto("Test Drive Forward"));
-
-      // Test Auto 2: L-shape path (forward 2m, turn 90 deg, forward 1m)
-      // Purpose: Verify turning, rotation PID, and path transitions
-      chooser.addOption("Test: L-Shape", new PathPlannerAuto("Test L-Shape"));
-
-      System.out.println("Test autos loaded successfully");
-    } catch (Exception e) {
-      System.out.println("Test autos not found - create them in PathPlanner first!");
-      System.out.println("   See AutoSelector.createAutoChooser() comments for instructions");
-    }
-
-    // =====================================================================
-    // GAME AUTOS - Add your competition autonomous routines here!
-    // =====================================================================
-
-    // TODO: Create autonomous routines for current game (update each year)
+    // TODO: Uncomment these once you've created the paths in PathPlanner
+    // try {
+    //   // Test Auto 1: Simple straight line (2 meters forward)
+    //   // Purpose: Verify basic path following, encoders, and gyro
+    //   chooser.addOption("Test: Drive Forward", new PathPlannerAuto("Test Drive Forward"));
     //
-    // Examples:
-    // chooser.addOption("3 Piece Auto", new PathPlannerAuto("3 Piece Auto"));
-    // chooser.addOption("2 Piece Auto", new PathPlannerAuto("2 Piece Auto"));
-    // chooser.addOption("Leave Only", new PathPlannerAuto("Leave Only"));
+    //   // Test Auto 2: L-shape path (forward 2m, turn 90 deg, forward 1m)
+    //   // Purpose: Verify turning, rotation PID, and path transitions
+    //   chooser.addOption("Test: L-Shape", new PathPlannerAuto("Test L-Shape"));
+    //
+    //   System.out.println("Test autos loaded successfully");
+    // } catch (Exception e) {
+    //   System.out.println("Test autos not found - create them in PathPlanner first!");
+    //   System.out.println("   See AutoSelector.createAutoChooser() comments for instructions");
+    // }
+
+    // =====================================================================
+    // GAME AUTOS - Command-based autonomous routines
+    // =====================================================================
+
+    // Simple Auto 1: Drive back 2 feet and shoot for 10 seconds
+    // Purpose: Score preloaded game piece and back away from starting zone
+    chooser.addOption("Drive Back and Shoot",
+      Commands.sequence(
+        // Drive backwards 2 feet using odometry to track distance
+        // Easy to adjust on competition day: just change the feet/inches numbers
+        createDriveDistanceCommand(-0.5, 0, 2, 0), // backwards at 0.5 m/s for 2 feet 0 inches
+        // Run shooter for 10 seconds
+        fuel.launchCommand().withTimeout(10.0),
+        // Stop shooter
+        Commands.runOnce(() -> fuel.stop(), fuel)
+      )
+    );
+
+    // Simple Auto 2: Shoot for 10 seconds then drive backwards 3 feet
+    // Purpose: Score preloaded game piece, then leave starting zone
+    chooser.addOption("Shoot then Drive Back",
+      Commands.sequence(
+        // Run shooter for 10 seconds
+        fuel.launchCommand().withTimeout(10.0),
+        // Stop shooter
+        Commands.runOnce(() -> fuel.stop(), fuel),
+        // Drive backwards 3 feet
+        createDriveDistanceCommand(-0.5, 0, 3, 0) // backwards at 0.5 m/s for 3 feet
+      )
+    );
+
+    // Simple Auto 3: Do nothing
+    // Purpose: For testing, or when you just want to stay put
+    chooser.addOption("Do Nothing", Commands.none());
+
+    // TODO: Create additional autonomous routines for current game (update each year)
+    //
+    // OPTION 1 - Command-based (like the autos above):
+    //   Use createDriveDistanceCommand() and Commands.sequence() for simple routines
+    //
+    // OPTION 2 - PathPlanner (for complex paths with curves/obstacles):
+    //   Create paths in PathPlanner app, then add:
+    //   chooser.addOption("3 Piece Auto", new PathPlannerAuto("3 Piece Auto"));
+    //   chooser.addOption("2 Piece Auto", new PathPlannerAuto("2 Piece Auto"));
 
     return chooser;
+  }
+
+  // =========================================================================
+  // HELPER METHODS FOR SIMPLE AUTOS
+  // =========================================================================
+
+  /**
+   * Creates a command that drives a specific distance using odometry.
+   *
+   * <p><b>COMPETITION DAY FRIENDLY:</b> Uses feet + inches for easy adjustments.
+   * No need to convert to decimals or meters in high-pressure situations!
+   *
+   * <p><b>Example usage:</b>
+   * <pre>
+   * // Drive forward 3 feet
+   * createDriveDistanceCommand(0.5, 0, 3, 0)
+   *
+   * // Drive backward 2 feet 6 inches
+   * createDriveDistanceCommand(-0.5, 0, 2, 6)
+   *
+   * // Drive backward 1 foot 3 inches
+   * createDriveDistanceCommand(-0.5, 0, 1, 3)
+   *
+   * // Strafe right 2 feet
+   * createDriveDistanceCommand(0, 0.5, 2, 0)
+   * </pre>
+   *
+   * @param xSpeed Forward speed in m/s (negative = backwards)
+   * @param ySpeed Strafe speed in m/s (negative = left, positive = right)
+   * @param feet Distance in feet
+   * @param inches Additional distance in inches (added to feet)
+   * @return Command that drives the specified distance
+   */
+  private Command createDriveDistanceCommand(double xSpeed, double ySpeed, int feet, int inches) {
+    // Convert feet + inches to meters once
+    double distanceMeters = Units.feetToMeters(feet) + Units.inchesToMeters(inches);
+
+    return Commands.defer(() -> {
+      // Capture the starting pose once when command initializes
+      Pose2d startPose = drive.getCurrentPose();
+
+      return Commands.runEnd(
+        // Execute: Drive at specified speed
+        () -> drive.drive(xSpeed, ySpeed, 0, false),
+        // End: Stop driving
+        () -> drive.drive(0, 0, 0, false),
+        drive
+      ).until(() -> {
+        // Check if we've traveled the target distance
+        double distanceTraveled = drive.getCurrentPose().getTranslation()
+            .getDistance(startPose.getTranslation());
+        return distanceTraveled >= distanceMeters;
+      });
+    }, Set.of(drive)).withTimeout(5.0); // Safety timeout: 5 seconds max
   }
 
   // =========================================================================
@@ -147,6 +253,9 @@ public class AutoSelector {
 
   /**
    * Registers named commands for use in PathPlanner autonomous routines.
+   *
+   * <p><b>NOTE:</b> These are only used when you create PathPlanner paths.
+   * The simple command-based autos above don't need named commands.
    *
    * <p><b>What are named commands?</b> Custom actions that can be inserted into
    * autonomous paths (e.g., run intake, shoot, deploy mechanism).
@@ -165,7 +274,7 @@ public class AutoSelector {
    */
   public static void registerNamedCommands() {
     // =====================================================================
-    // DEBUG COMMANDS - Useful for testing
+    // DEBUG COMMANDS - Useful for testing PathPlanner paths
     // =====================================================================
 
     NamedCommands.registerCommand(
@@ -179,7 +288,7 @@ public class AutoSelector {
     );
 
     // =====================================================================
-    // GAME-SPECIFIC NAMED COMMANDS - Add yours here!
+    // GAME-SPECIFIC NAMED COMMANDS - Add yours here when using PathPlanner!
     // =====================================================================
 
     // TODO: Register game-specific commands for use in PathPlanner autonomous

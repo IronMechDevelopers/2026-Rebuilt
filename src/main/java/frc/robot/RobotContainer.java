@@ -111,7 +111,7 @@ public class RobotContainer {
     // =====================================================================
     // STEP 2: Create auto selector
     // =====================================================================
-    autoSelector = new AutoSelector();
+    autoSelector = new AutoSelector(drive, ballSubsystem);
 
     // =====================================================================
     // STEP 3: Set default drive command
