@@ -16,77 +16,77 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import static frc.robot.constants.FuelConstants.*;
 
 public class CANFuelSubsystem extends SubsystemBase {
-  private final SparkMax feederRoller;
-  private final SparkMax intakeLauncherRoller;
+  private final SparkMax indexerRoller;
+  private final SparkMax mainRoller;
 
   /** Creates a new CANBallSubsystem. */
   public CANFuelSubsystem() {
     // create brushed motors for each of the motors on the launcher mechanism
-    intakeLauncherRoller = new SparkMax(INTAKE_LAUNCHER_MOTOR_ID, MotorType.kBrushed);
-    feederRoller = new SparkMax(FEEDER_MOTOR_ID, MotorType.kBrushed);
+    mainRoller = new SparkMax(MAIN_ROLLER_MOTOR_ID, MotorType.kBrushed);
+    indexerRoller = new SparkMax(INDEXER_MOTOR_ID, MotorType.kBrushed);
 
     // put default values for various fuel operations onto the dashboard
     // all methods in this subsystem pull their values from the dashbaord to allow
     // you to tune the values easily, and then replace the values in Constants.java
     // with your new values. For more information, see the Software Guide.
-    SmartDashboard.putNumber("Intaking feeder roller value", INTAKING_FEEDER_VOLTAGE);
-    SmartDashboard.putNumber("Intaking intake roller value", INTAKING_INTAKE_VOLTAGE);
-    SmartDashboard.putNumber("Launching feeder roller value", LAUNCHING_FEEDER_VOLTAGE);
-    SmartDashboard.putNumber("Launching launcher roller value", LAUNCHING_LAUNCHER_VOLTAGE);
-    SmartDashboard.putNumber("Spin-up feeder roller value", SPIN_UP_FEEDER_VOLTAGE);
+    SmartDashboard.putNumber("Intaking indexer roller value", INTAKING_INDEXER_VOLTAGE);
+    SmartDashboard.putNumber("Intaking main roller value", INTAKING_MAIN_ROLLER_VOLTAGE);
+    SmartDashboard.putNumber("Launching indexer roller value", LAUNCHING_INDEXER_VOLTAGE);
+    SmartDashboard.putNumber("Launching main roller value", LAUNCHING_MAIN_ROLLER_VOLTAGE);
+    SmartDashboard.putNumber("Spin-up indexer roller value", SPIN_UP_INDEXER_VOLTAGE);
 
-    // create the configuration for the feeder roller, set a current limit and apply
+    // create the configuration for the indexer roller, set a current limit and apply
     // the config to the controller
-    SparkMaxConfig feederConfig = new SparkMaxConfig();
-    feederConfig.smartCurrentLimit(FEEDER_MOTOR_CURRENT_LIMIT);
-    feederConfig.inverted(true);
-    feederRoller.configure(feederConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    SparkMaxConfig indexerConfig = new SparkMaxConfig();
+    indexerConfig.smartCurrentLimit(INDEXER_CURRENT_LIMIT);
+    indexerConfig.inverted(true);
+    indexerRoller.configure(indexerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
-    // create the configuration for the launcher roller, set a current limit, set
+    // create the configuration for the main roller, set a current limit, set
     // the motor to inverted so that positive values are used for both intaking and
     // launching, and apply the config to the controller
-    SparkMaxConfig launcherConfig = new SparkMaxConfig();
-    launcherConfig.inverted(true);
-    launcherConfig.smartCurrentLimit(LAUNCHER_MOTOR_CURRENT_LIMIT);
-    intakeLauncherRoller.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    SparkMaxConfig mainRollerConfig = new SparkMaxConfig();
+    mainRollerConfig.inverted(true);
+    mainRollerConfig.smartCurrentLimit(MAIN_ROLLER_CURRENT_LIMIT);
+    mainRoller.configure(mainRollerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
   }
 
   // A method to set the rollers to values for intaking
   public void intake() {
-    feederRoller.setVoltage(SmartDashboard.getNumber("Intaking feeder roller value", INTAKING_FEEDER_VOLTAGE));
-    intakeLauncherRoller
-        .setVoltage(SmartDashboard.getNumber("Intaking intake roller value", INTAKING_INTAKE_VOLTAGE));
+    indexerRoller.setVoltage(SmartDashboard.getNumber("Intaking indexer roller value", INTAKING_INDEXER_VOLTAGE));
+    mainRoller
+        .setVoltage(SmartDashboard.getNumber("Intaking main roller value", INTAKING_MAIN_ROLLER_VOLTAGE));
   }
 
   // A method to set the rollers to values for ejecting fuel out the intake. Uses
   // the same values as intaking, but in the opposite direction.
   public void eject() {
-    feederRoller
-        .setVoltage(EJECT_FEEDER_VOLTAGE);
-    intakeLauncherRoller
-        .setVoltage(EJECT_INTAKE_vOLTAGE);
+    indexerRoller
+        .setVoltage(EJECT_INDEXER_VOLTAGE);
+    mainRoller
+        .setVoltage(EJECT_MAIN_ROLLER_VOLTAGE);
   }
 
   // A method to set the rollers to values for launching.
   public void launch() {
-    feederRoller.setVoltage(SmartDashboard.getNumber("Launching feeder roller value", LAUNCHING_FEEDER_VOLTAGE));
-    intakeLauncherRoller
-        .setVoltage(SmartDashboard.getNumber("Launching launcher roller value", LAUNCHING_LAUNCHER_VOLTAGE));
+    indexerRoller.setVoltage(SmartDashboard.getNumber("Launching indexer roller value", LAUNCHING_INDEXER_VOLTAGE));
+    mainRoller
+        .setVoltage(SmartDashboard.getNumber("Launching main roller value", LAUNCHING_MAIN_ROLLER_VOLTAGE));
   }
 
   // A method to stop the rollers
   public void stop() {
-    feederRoller.set(0);
-    intakeLauncherRoller.set(0);
+    indexerRoller.set(0);
+    mainRoller.set(0);
   }
 
-  // A method to spin up the launcher roller while spinning the feeder roller to
+  // A method to spin up the main roller while spinning the indexer roller to
   // push Fuel away from the launcher
   public void spinUp() {
-    feederRoller
-        .setVoltage(SmartDashboard.getNumber("Spin-up feeder roller value", SPIN_UP_FEEDER_VOLTAGE));
-    intakeLauncherRoller
-        .setVoltage(SmartDashboard.getNumber("Launching launcher roller value", LAUNCHING_LAUNCHER_VOLTAGE));
+    indexerRoller
+        .setVoltage(SmartDashboard.getNumber("Spin-up indexer roller value", SPIN_UP_INDEXER_VOLTAGE));
+    mainRoller
+        .setVoltage(SmartDashboard.getNumber("Launching main roller value", LAUNCHING_MAIN_ROLLER_VOLTAGE));
   }
 
   // A command factory to turn the spinUp method into a command that requires this
