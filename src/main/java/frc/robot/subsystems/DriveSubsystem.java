@@ -15,6 +15,7 @@ import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
@@ -30,6 +31,7 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.constants.DriveConstants;
+import frc.robot.constants.FieldConstants;
 import frc.robot.constants.HardwareConstants;
 import edu.wpi.first.math.Matrix;
 
@@ -72,6 +74,8 @@ public class DriveSubsystem extends SubsystemBase {
     private boolean isBrownedOut = false;
     private double lastVisionUpdateTime = 0.0;
     private Pose2d latestVisionPose = new Pose2d();  // Latest raw vision estimate (for logging)
+    private double distanceToHub = 0.0;              // Distance to scoring hub (meters)
+    private boolean inHubRange = false;              // Within scoring range
 
     // =====================================================================══
     // VISION REJECTION TRACKING - Debug why poses are filtered in DriveSubsystem
@@ -233,6 +237,16 @@ public class DriveSubsystem extends SubsystemBase {
 
         // --- GYRO (Essential for odometry replay) ---
         Logger.recordOutput("Gyro/YawDeg", gyro.getYaw());
+
+        // --- DISTANCE TO HUB (For drive team scoring awareness) ---
+        Translation2d currentTranslation = getCurrentPose().getTranslation();
+        Translation2d hubCenter = FieldConstants.getAllianceHubCenter();
+        distanceToHub = currentTranslation.getDistance(hubCenter);
+        inHubRange = distanceToHub >= FieldConstants.kMinShootingDistance
+                     && distanceToHub <= FieldConstants.kMaxShootingDistance;
+
+        Logger.recordOutput("Drive/DistanceToHub", distanceToHub);
+        Logger.recordOutput("Drive/InHubRange", inHubRange);
     }
 
     /**
@@ -537,6 +551,24 @@ public class DriveSubsystem extends SubsystemBase {
      */
     public boolean isVisionHealthy() {
         return vision.isVisionHealthy();
+    }
+
+    /**
+     * Returns the distance from the robot to the alliance hub center.
+     *
+     * @return distance in meters
+     */
+    public double getDistanceToHub() {
+        return distanceToHub;
+    }
+
+    /**
+     * Returns true if the robot is within the valid scoring range of the hub.
+     *
+     * @return true if between min and max shooting distance
+     */
+    public boolean isInHubRange() {
+        return inHubRange;
     }
 
     /**

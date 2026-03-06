@@ -51,11 +51,15 @@ public class DashboardSetup {
   // =====================================================================══════
   private GenericEntry matchHubActive;
   private GenericEntry matchHubStatus;
+  private GenericEntry matchNextStatus;
   private GenericEntry matchShiftCountdown;
   private GenericEntry matchPhase;
   private GenericEntry matchWarning;
+  private GenericEntry matchShiftPattern;
   private GenericEntry matchBattery;
   private GenericEntry matchVisionHealthy;
+  private GenericEntry matchDistanceToHub;
+  private GenericEntry matchInRange;
 
   // =====================================================================══════
   // PIT TAB
@@ -154,20 +158,28 @@ public class DashboardSetup {
   private void configureMatchTab() {
     ShuffleboardTab tab = Shuffleboard.getTab("Match");
 
-    // Core match info
+    // Row 0: Hub status and countdown (primary focus)
     matchHubActive = tab.add("Hub Active", false).withPosition(0, 0).withSize(2, 2).getEntry();
     matchHubStatus = tab.add("Hub Status", "---").withPosition(2, 0).withSize(2, 1).getEntry();
-    matchShiftCountdown = tab.add("Shift In (sec)", 0).withPosition(4, 0).withSize(2, 1).getEntry();
-    matchPhase = tab.add("Phase", "---").withPosition(2, 1).withSize(2, 1).getEntry();
-    matchWarning = tab.add("Warning", "").withPosition(0, 2).withSize(4, 1).getEntry();
+    matchNextStatus = tab.add("Next Status", "---").withPosition(4, 0).withSize(2, 1).getEntry();
+    matchShiftCountdown = tab.add("Shift In (sec)", 0).withPosition(6, 0).withSize(2, 2).getEntry();
 
-    // Status indicators
+    // Row 1: Phase and status indicators
+    matchPhase = tab.add("Phase", "---").withPosition(2, 1).withSize(2, 1).getEntry();
     matchBattery = tab.add("Battery V", 0.0).withPosition(4, 1).withSize(1, 1).getEntry();
     matchVisionHealthy = tab.add("Vision OK", false).withPosition(5, 1).withSize(1, 1).getEntry();
+    matchDistanceToHub = tab.add("Distance (m)", 0.0).withPosition(6, 1).withSize(1, 1).getEntry();
+    matchInRange = tab.add("In Range", false).withPosition(7, 1).withSize(1, 1).getEntry();
 
-    // Auto chooser and field
-    tab.add("Auto Selector", autoChooser).withPosition(0, 3).withSize(3, 1);
-    tab.add("Field", matchField).withPosition(3, 2).withSize(4, 3);
+    // Row 2: WARNING BANNER - Full width for maximum visibility
+    matchWarning = tab.add("WARNING", "").withPosition(0, 2).withSize(8, 1).getEntry();
+
+    // Row 3: Shift pattern timeline and auto selector
+    matchShiftPattern = tab.add("Shift Pattern", "").withPosition(0, 3).withSize(5, 1).getEntry();
+    tab.add("Auto Selector", autoChooser).withPosition(5, 3).withSize(3, 1);
+
+    // Rows 4-6: Field visualization (larger for better visibility)
+    tab.add("Field", matchField).withPosition(0, 4).withSize(8, 3);
   }
 
   private void configurePitTab() {
@@ -252,14 +264,19 @@ public class DashboardSetup {
     HubStatus hubStatus = matchStateTracker.getOurHubStatus();
     matchHubActive.setBoolean(hubStatus == HubStatus.ACTIVE);
     matchHubStatus.setString(hubStatus.getDisplayName());
+    matchNextStatus.setString(matchStateTracker.getNextHubStatus().getDisplayName());
     matchShiftCountdown.setDouble(Math.ceil(matchStateTracker.getTimeUntilNextShift()));
     matchPhase.setString(matchStateTracker.getCurrentPhase().getDisplayName());
 
     WarningLevel warning = matchStateTracker.getCurrentWarning();
     matchWarning.setString(warning.getMessage());
 
+    matchShiftPattern.setString(generateShiftPatternString());
+
     matchBattery.setDouble(round1(RobotController.getBatteryVoltage()));
     matchVisionHealthy.setBoolean(driveSubsystem.isVisionHealthy());
+    matchDistanceToHub.setDouble(round1(driveSubsystem.getDistanceToHub()));
+    matchInRange.setBoolean(driveSubsystem.isInHubRange());
   }
 
   private void updatePitTab() {
@@ -311,6 +328,31 @@ public class DashboardSetup {
       pitVisionReset.setBoolean(false);
       scheduler.schedule(UtilityCommands.forceVisionReset(driveSubsystem));
     }
+  }
+
+  /**
+   * Generates a compact shift pattern string for the drive team.
+   * Format: "S1:ACTIVE → S2:INACTIVE → S3:ACTIVE → S4:INACTIVE"
+   */
+  private String generateShiftPatternString() {
+    String[] pattern = matchStateTracker.getShiftPatternArray();
+
+    // Extract just the shifts (indices 2-5) and format compactly
+    StringBuilder sb = new StringBuilder();
+    for (int i = 2; i < 6; i++) {
+      if (i > 2) {
+        sb.append(" → ");
+      }
+      String shift = pattern[i];
+      // Convert "SHIFT 1: ACTIVE (25s)" to "S1:ACTIVE"
+      if (shift.contains("SHIFT")) {
+        String shiftNum = shift.substring(6, 7); // Extract "1" from "SHIFT 1"
+        String status = shift.contains("ACTIVE") ? "ACTIVE" :
+                       shift.contains("INACTIVE") ? "INACTIVE" : "UNKNOWN";
+        sb.append("S").append(shiftNum).append(":").append(status);
+      }
+    }
+    return sb.toString();
   }
 
   private double round1(double value) {

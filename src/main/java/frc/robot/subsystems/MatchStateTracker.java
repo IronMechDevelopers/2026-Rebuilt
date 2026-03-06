@@ -175,6 +175,47 @@ public class MatchStateTracker extends SubsystemBase {
         return currentWarning != WarningLevel.NONE;
     }
 
+    /**
+     * Gets the full match shift pattern for timeline visualization.
+     *
+     * @return String array with 7 elements representing the match timeline:
+     *         [AUTO, TRANSITION, SHIFT_1, SHIFT_2, SHIFT_3, SHIFT_4, ENDGAME]
+     *         Each formatted as "SHIFT 1: ACTIVE (25s)" or "AUTO: ACTIVE (20s)"
+     */
+    public String[] getShiftPatternArray() {
+        String[] pattern = new String[7];
+
+        // Auto and Transition are always ACTIVE
+        pattern[0] = "AUTO: ACTIVE (20s)";
+        pattern[1] = "TRANS: ACTIVE (10s)";
+
+        // If FMS data not received yet, show UNKNOWN
+        if (!fmsDataReceived && !practiceMode) {
+            pattern[2] = "SHIFT 1: UNKNOWN (25s)";
+            pattern[3] = "SHIFT 2: UNKNOWN (25s)";
+            pattern[4] = "SHIFT 3: UNKNOWN (25s)";
+            pattern[5] = "SHIFT 4: UNKNOWN (25s)";
+        } else {
+            // Determine if we're inactive in odd shifts (1 & 3)
+            boolean weAreInactiveInOddShifts = practiceMode ?
+                practiceWeAreInactiveFirst : isOurAllianceInactiveInOddShifts();
+
+            // Odd shifts (1 & 3)
+            String oddStatus = weAreInactiveInOddShifts ? "INACTIVE" : "ACTIVE";
+            String evenStatus = weAreInactiveInOddShifts ? "ACTIVE" : "INACTIVE";
+
+            pattern[2] = "SHIFT 1: " + oddStatus + " (25s)";
+            pattern[3] = "SHIFT 2: " + evenStatus + " (25s)";
+            pattern[4] = "SHIFT 3: " + oddStatus + " (25s)";
+            pattern[5] = "SHIFT 4: " + evenStatus + " (25s)";
+        }
+
+        // Endgame is always ACTIVE
+        pattern[6] = "ENDGAME: ACTIVE (30s)";
+
+        return pattern;
+    }
+
     // =========================================================================
     // PERIODIC UPDATE
     // =========================================================================
@@ -450,6 +491,12 @@ public class MatchStateTracker extends SubsystemBase {
         Logger.recordOutput("Match/FmsDataReceived", fmsDataReceived || practiceMode);
         // Note: Match/Alliance is logged in RobotContainer to avoid duplication
         Logger.recordOutput("Match/PracticeMode", practiceMode);
+
+        // Shift pattern array for timeline visualization
+        Logger.recordOutput("Match/ShiftPattern", getShiftPatternArray());
+
+        // Phase index for graphing (ordinal value)
+        Logger.recordOutput("Match/PhaseIndex", currentPhase.ordinal());
     }
 
     // =========================================================================
