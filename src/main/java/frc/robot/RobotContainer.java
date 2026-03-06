@@ -96,6 +96,19 @@ public class RobotContainer {
   );
 
   // =========================================================================
+  // LOGGING OPTIMIZATION - Cache rarely-changing values
+  // =========================================================================
+
+  /** Cached DriverStation values to reduce JNI calls */
+  private String cachedEventName = "";
+  private int cachedMatchNumber = -1;
+  private DriverStation.Alliance cachedAlliance = DriverStation.Alliance.Red;
+  private int logCycleCounter = 0;
+
+  /** Cached command name to only log on change */
+  private String lastCommandName = "";
+
+  // =========================================================================
   // CONSTRUCTOR
   // =========================================================================
 
@@ -230,11 +243,55 @@ public class RobotContainer {
     // These are the raw joystick values BEFORE deadband/processing
     // Essential for replaying exactly what the driver did
 
+    // Driver controller (left stick = translation, right stick = rotation)
+    Logger.recordOutput("DriverInputs/LeftX", driver.getLeftX());
+    Logger.recordOutput("DriverInputs/LeftY", driver.getLeftY());
+    Logger.recordOutput("DriverInputs/RightX", driver.getRightX());
+    Logger.recordOutput("DriverInputs/RightY", driver.getRightY());
+    Logger.recordOutput("DriverInputs/LeftTrigger", driver.getLeftTriggerAxis());
+    Logger.recordOutput("DriverInputs/RightTrigger", driver.getRightTriggerAxis());
+
+    // Driver buttons (for command triggers)
+    Logger.recordOutput("DriverInputs/A", driver.a().getAsBoolean());
+    Logger.recordOutput("DriverInputs/B", driver.b().getAsBoolean());
+    Logger.recordOutput("DriverInputs/X", driver.x().getAsBoolean());
+    Logger.recordOutput("DriverInputs/Y", driver.y().getAsBoolean());
+    Logger.recordOutput("DriverInputs/LeftBumper", driver.leftBumper().getAsBoolean());
+    Logger.recordOutput("DriverInputs/RightBumper", driver.rightBumper().getAsBoolean());
+    Logger.recordOutput("DriverInputs/Back", driver.back().getAsBoolean());
+    Logger.recordOutput("DriverInputs/Start", driver.start().getAsBoolean());
+
+    // Co-driver controller (operates fuel subsystem)
+    Logger.recordOutput("CoDriverInputs/LeftX", coDriver.getLeftX());
+    Logger.recordOutput("CoDriverInputs/LeftY", coDriver.getLeftY());
+    Logger.recordOutput("CoDriverInputs/RightX", coDriver.getRightX());
+    Logger.recordOutput("CoDriverInputs/RightY", coDriver.getRightY());
+    Logger.recordOutput("CoDriverInputs/LeftTrigger", coDriver.getLeftTriggerAxis());
+    Logger.recordOutput("CoDriverInputs/RightTrigger", coDriver.getRightTriggerAxis());
+
+    Logger.recordOutput("CoDriverInputs/A", coDriver.a().getAsBoolean());
+    Logger.recordOutput("CoDriverInputs/B", coDriver.b().getAsBoolean());
+    Logger.recordOutput("CoDriverInputs/X", coDriver.x().getAsBoolean());
+    Logger.recordOutput("CoDriverInputs/Y", coDriver.y().getAsBoolean());
+    Logger.recordOutput("CoDriverInputs/LeftBumper", coDriver.leftBumper().getAsBoolean());
+    Logger.recordOutput("CoDriverInputs/RightBumper", coDriver.rightBumper().getAsBoolean());
+    Logger.recordOutput("CoDriverInputs/Back", coDriver.back().getAsBoolean());
+    Logger.recordOutput("CoDriverInputs/Start", coDriver.start().getAsBoolean());
 
     // =====================================================================══
     // MATCH CONTEXT - Know when things happened
     // =====================================================================══
 
+    // Update cached values every 50 cycles (1 second) to reduce JNI calls
+    if (logCycleCounter % 50 == 0) {
+      cachedEventName = DriverStation.getEventName();
+      cachedMatchNumber = DriverStation.getMatchNumber();
+      var alliance = DriverStation.getAlliance();
+      cachedAlliance = alliance.isPresent() ? alliance.get() : DriverStation.Alliance.Red;
+    }
+    logCycleCounter++;
+
+    // High-frequency logs (these change frequently during a match)
     Logger.recordOutput("Match/TimeRemaining", DriverStation.getMatchTime());
     Logger.recordOutput("Match/IsEnabled", DriverStation.isEnabled());
     Logger.recordOutput("Match/IsAutonomous", DriverStation.isAutonomousEnabled());
@@ -243,22 +300,25 @@ public class RobotContainer {
     Logger.recordOutput("Match/IsDSAttached", DriverStation.isDSAttached());
     Logger.recordOutput("Match/IsFMSAttached", DriverStation.isFMSAttached());
 
-    var alliance = DriverStation.getAlliance();
-    Logger.recordOutput("Match/Alliance", alliance.isPresent() ? alliance.get().name() : "Unknown");
-    Logger.recordOutput("Match/MatchNumber", DriverStation.getMatchNumber());
-    Logger.recordOutput("Match/EventName", DriverStation.getEventName());
+    // Low-frequency logs (cached - updated at 1 Hz instead of 50 Hz)
+    Logger.recordOutput("Match/Alliance", cachedAlliance.name());
+    Logger.recordOutput("Match/MatchNumber", cachedMatchNumber);
+    Logger.recordOutput("Match/EventName", cachedEventName);
 
     // =====================================================================══
     // COMMAND STATE - Know what code was running
     // =====================================================================══
 
-    // Log the current command running on the drive subsystem
+    // Log command changes only (reduces string allocations and log bandwidth)
     Command currentDriveCommand = drive.getCurrentCommand();
-    Logger.recordOutput("Commands/DriveCommand",
-        currentDriveCommand != null ? currentDriveCommand.getName() : "None");
-    Logger.recordOutput("Commands/IsDefaultCommand",
-        currentDriveCommand != null &&
-        currentDriveCommand.equals(drive.getDefaultCommand()));
+    String currentCommandName = currentDriveCommand != null ? currentDriveCommand.getName() : "None";
+
+    if (!currentCommandName.equals(lastCommandName)) {
+      Logger.recordOutput("Commands/DriveCommand", currentCommandName);
+      Logger.recordOutput("Commands/IsDefaultCommand",
+          currentDriveCommand != null && currentDriveCommand.equals(drive.getDefaultCommand()));
+      lastCommandName = currentCommandName;
+    }
 
     // =====================================================================══
     // CAN BUS HEALTH - Catch hardware issues

@@ -448,7 +448,7 @@ public class MatchStateTracker extends SubsystemBase {
         Logger.recordOutput("Match/Warning", currentWarning.getMessage());
         Logger.recordOutput("Match/HubActive", ourHubStatus == HubStatus.ACTIVE);
         Logger.recordOutput("Match/FmsDataReceived", fmsDataReceived || practiceMode);
-        Logger.recordOutput("Match/Alliance", ourAlliance.toString());
+        // Note: Match/Alliance is logged in RobotContainer to avoid duplication
         Logger.recordOutput("Match/PracticeMode", practiceMode);
     }
 

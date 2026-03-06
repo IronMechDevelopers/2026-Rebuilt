@@ -10,6 +10,8 @@ import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.SparkMax;
 
+import org.littletonrobotics.junction.Logger;
+
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -103,6 +105,11 @@ public class CANFuelSubsystem extends SubsystemBase {
 
   @Override
   public void periodic() {
-    // This method will be called once per scheduler run
+    // Log motor states for debugging fuel handling issues
+    Logger.recordOutput("Fuel/IndexerCurrent", indexerRoller.getOutputCurrent());
+    Logger.recordOutput("Fuel/IndexerAppliedOutput", indexerRoller.getAppliedOutput());
+
+    Logger.recordOutput("Fuel/MainRollerCurrent", mainRoller.getOutputCurrent());
+    Logger.recordOutput("Fuel/MainRollerAppliedOutput", mainRoller.getAppliedOutput());
   }
 }
