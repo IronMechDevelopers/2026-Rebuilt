@@ -9,6 +9,7 @@ import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import com.studica.frc.AHRS;
+import com.studica.frc.AHRS.NavXComType;
 
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
@@ -27,6 +28,8 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.SPI;
+import edu.wpi.first.wpilibj.SerialPort;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -34,6 +37,7 @@ import frc.robot.constants.DriveConstants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.constants.HardwareConstants;
 import edu.wpi.first.math.Matrix;
+import edu.wpi.first.wpilibj.SPI;
 
 /**
  * Controls the swerve drivetrain and handles pose estimation (Odometry + Vision).
@@ -61,7 +65,7 @@ public class DriveSubsystem extends SubsystemBase {
         HardwareConstants.kRearRightTurningCanId,
         HardwareConstants.kBackRightChassisAngularOffset);
 
-    private final AHRS gyro = new AHRS(AHRS.NavXComType.kMXP_SPI);
+    private final AHRS gyro = new AHRS(NavXComType.kMXP_SPI);
 
     // Pose Tracking
     private final SwerveDrivePoseEstimator poseEstimator;
@@ -237,6 +241,8 @@ public class DriveSubsystem extends SubsystemBase {
 
         // --- GYRO (Essential for odometry replay) ---
         Logger.recordOutput("Gyro/YawDeg", gyro.getYaw());
+        Logger.recordOutput("Gyro/RolDeg", gyro.getRoll());
+        Logger.recordOutput("Gyro/YawPitch", gyro.getPitch());
 
         // --- DISTANCE TO HUB (For drive team scoring awareness) ---
         Translation2d currentTranslation = getCurrentPose().getTranslation();
@@ -247,6 +253,7 @@ public class DriveSubsystem extends SubsystemBase {
 
         Logger.recordOutput("Drive/DistanceToHub", distanceToHub);
         Logger.recordOutput("Drive/InHubRange", inHubRange);
+        Logger.recordOutput("Drive/fieldRelative", fieldRelative);
     }
 
     /**
@@ -477,6 +484,7 @@ public class DriveSubsystem extends SubsystemBase {
      * Preserves the current X/Y position.
      */
     public void zeroHeading() {
+        gyro.reset();
         setHeading(new Rotation2d()); // 0 degrees
     }
 
@@ -550,11 +558,11 @@ public class DriveSubsystem extends SubsystemBase {
         if (alliance.isPresent() && alliance.get() == Alliance.Red) {
             // Red alliance: Start in front of red hub (toward red alliance wall)
             double startX = hubCenter.getX() + FieldConstants.kOptimalShootingDistance;
-            startPose = new Pose2d(startX, hubCenter.getY(), Rotation2d.fromDegrees(180));
+            startPose = new Pose2d(startX, hubCenter.getY(), Rotation2d.fromDegrees(0));
         } else {
             // Blue alliance: Start in front of blue hub (toward blue alliance wall)
             double startX = hubCenter.getX() - FieldConstants.kOptimalShootingDistance;
-            startPose = new Pose2d(startX, hubCenter.getY(), Rotation2d.fromDegrees(0));
+            startPose = new Pose2d(startX, hubCenter.getY(), Rotation2d.fromDegrees(180));
         }
 
         resetPose(startPose);
@@ -730,4 +738,7 @@ public class DriveSubsystem extends SubsystemBase {
             new SwerveModuleState(0, Rotation2d.fromDegrees(0))
         });
     }
+
+        public void calibrateGyrp() {
+        }
 }

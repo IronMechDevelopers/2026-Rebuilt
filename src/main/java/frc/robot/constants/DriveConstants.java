@@ -139,7 +139,7 @@ public final class DriveConstants {
   // =====================================================================══
 
   /** Joystick deadband (0.0 to 1.0). Prevents drift when stick is released. */
-  public static final double kJoystickDeadband = 0.1;
+  public static final double kJoystickDeadband = 0.15;
 
   /** Translation slew rate limiter (units/sec). Prevents tipping during acceleration. */
   public static final double kTranslationSlewRate = 3.0;
@@ -159,7 +159,7 @@ public final class DriveConstants {
    *
    * Start at (5.0, 0, 0). Tune P if robot oscillates or doesn't reach angle.
    */
-  public static final PIDConstants kRotationPID = new PIDConstants(5.0, 0.0, 0.0);
+  public static final PIDConstants kRotationPID = new PIDConstants(5.5, 0.0, 0.0);
 
   /** Max velocity for pathfinding (m/s). */
   public static final double kPathfindMaxVelMetersPerSecond = 3.0;

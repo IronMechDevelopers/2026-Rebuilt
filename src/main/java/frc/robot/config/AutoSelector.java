@@ -4,6 +4,7 @@
 
 package frc.robot.config;
 
+import java.security.SecurityPermission;
 import java.util.Set;
 
 import com.pathplanner.lib.auto.NamedCommands;
@@ -13,7 +14,9 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.WaitCommand;
 import frc.robot.subsystems.DriveSubsystem;
+import frc.robot.constants.FuelConstants;
 import frc.robot.subsystems.CANFuelSubsystem;
 
 /**
@@ -46,30 +49,22 @@ public class AutoSelector {
 
   private SendableChooser<Command> createAutoChooser() {
     SendableChooser<Command> chooser = new SendableChooser<>();
-    chooser.setDefaultOption("None", null);
 
-    // TODO: Add PathPlanner autos once paths are created
-    // chooser.addOption("3 Piece Auto", new PathPlannerAuto("3 Piece Auto"));
-    // chooser.addOption("2 Piece Auto", new PathPlannerAuto("2 Piece Auto"));
-    chooser.addOption("Drive Back and Shoot",
-      Commands.sequence(
-        createDriveDistanceCommand(-0.5, 0, 2, 0),
-        fuel.launchCommand().withTimeout(10.0),
-        Commands.runOnce(() -> fuel.stop(), fuel)
-      )
-    );
+  chooser.addOption("Shoot Gather Shoot", new PathPlannerAuto("Shoot Gather Shoot"));
+  chooser.addOption("Right Side Spin", new PathPlannerAuto("Right-Side-Spin"));
+  chooser.addOption("Right Hub Shoot", new PathPlannerAuto("Right Hub Shoot"));
+  chooser.addOption("Center Shoot", new PathPlannerAuto("Center Shoot"));
+  chooser.addOption("Outpost",new PathPlannerAuto("Outpost"));
 
-    chooser.addOption("Shoot then Drive Back",
-      Commands.sequence(
-        fuel.launchCommand().withTimeout(10.0),
-        Commands.runOnce(() -> fuel.stop(), fuel),
-        createDriveDistanceCommand(-0.5, 0, 3, 0)
-      )
-    );
 
-    chooser.addOption("Do Nothing", Commands.none());
+  chooser.setDefaultOption("Do Nothing", Commands.none());
 
     return chooser;
+  }
+
+  private Command waitForSeconds(int seconds)
+  {
+    return new WaitCommand(seconds);
   }
 
   private Command createDriveDistanceCommand(double xSpeed, double ySpeed, int feet, int inches) {

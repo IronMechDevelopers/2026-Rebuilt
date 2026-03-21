@@ -6,6 +6,9 @@ package frc.robot;
 
 import org.littletonrobotics.junction.Logger;
 
+import com.pathplanner.lib.auto.NamedCommands;
+import com.pathplanner.lib.commands.PathPlannerAuto;
+
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -13,6 +16,7 @@ import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.button.CommandPS4Controller;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.commands.DriveCommands;
 import frc.robot.config.AutoSelector;
@@ -21,6 +25,7 @@ import frc.robot.config.DashboardSetup;
 import frc.robot.config.SubsystemSetup;
 import frc.robot.config.VisionSetup;
 import frc.robot.constants.DriveConstants;
+import frc.robot.constants.FuelConstants;
 import frc.robot.constants.HardwareConstants;
 import frc.robot.subsystems.CANFuelSubsystem;
 import frc.robot.subsystems.DriveSubsystem;
@@ -69,11 +74,13 @@ public class RobotContainer {
   // CONTROLLERS
 
   /** Driver Xbox controller */
+  // private final CommandXboxController driver = new CommandXboxController(HardwareConstants.kDriverControllerPort);
   private final CommandXboxController driver = new CommandXboxController(HardwareConstants.kDriverControllerPort);
+  
 
   /** Co-driver Xbox controller */
-  private final CommandXboxController coDriver = new CommandXboxController(HardwareConstants.kCoDriverControllerPort);
-
+  // private final CommandXboxController coDriver = new CommandXboxController(HardwareConstants.kCoDriverControllerPort);
+  private final CommandPS4Controller coDriver = new CommandPS4Controller(HardwareConstants.kCoDriverControllerPort);
   // =========================================================================
   // CONFIGURATION OBJECTS
   // =========================================================================
@@ -120,11 +127,16 @@ public class RobotContainer {
     // STEP 1: Register PathPlanner named commands (MUST be first!)
     // =====================================================================
     AutoSelector.registerNamedCommands(ballSubsystem);
+    NamedCommands.registerCommand("intake",ballSubsystem.intakeCommand());
+    NamedCommands.registerCommand("shoot",ballSubsystem.spinUpCommand().withTimeout(2)
+            .andThen(ballSubsystem.launchCommand()));
 
     // =====================================================================
     // STEP 2: Create auto selector
     // =====================================================================
     autoSelector = new AutoSelector(drive, ballSubsystem);
+    
+    
 
     // =====================================================================
     // STEP 3: Set default drive command
@@ -181,7 +193,11 @@ public class RobotContainer {
    * @return Selected auto command or null
    */
   public Command getAutonomousCommand() {
-    return autoSelector.getSelectedAuto();
+    // return new PathPlannerAuto("Right-Side-Spin");
+    // return new PathPlannerAuto("right_hub_shoot");
+    // return new PathPlannerAuto("center_shoot");
+    return new PathPlannerAuto("Shoot Gather Shoot");
+    // return autoSelector.getSelectedAuto();
   }
 
   /**
@@ -243,40 +259,6 @@ public class RobotContainer {
     // These are the raw joystick values BEFORE deadband/processing
     // Essential for replaying exactly what the driver did
 
-    // Driver controller (left stick = translation, right stick = rotation)
-    Logger.recordOutput("DriverInputs/LeftX", driver.getLeftX());
-    Logger.recordOutput("DriverInputs/LeftY", driver.getLeftY());
-    Logger.recordOutput("DriverInputs/RightX", driver.getRightX());
-    Logger.recordOutput("DriverInputs/RightY", driver.getRightY());
-    Logger.recordOutput("DriverInputs/LeftTrigger", driver.getLeftTriggerAxis());
-    Logger.recordOutput("DriverInputs/RightTrigger", driver.getRightTriggerAxis());
-
-    // Driver buttons (for command triggers)
-    Logger.recordOutput("DriverInputs/A", driver.a().getAsBoolean());
-    Logger.recordOutput("DriverInputs/B", driver.b().getAsBoolean());
-    Logger.recordOutput("DriverInputs/X", driver.x().getAsBoolean());
-    Logger.recordOutput("DriverInputs/Y", driver.y().getAsBoolean());
-    Logger.recordOutput("DriverInputs/LeftBumper", driver.leftBumper().getAsBoolean());
-    Logger.recordOutput("DriverInputs/RightBumper", driver.rightBumper().getAsBoolean());
-    Logger.recordOutput("DriverInputs/Back", driver.back().getAsBoolean());
-    Logger.recordOutput("DriverInputs/Start", driver.start().getAsBoolean());
-
-    // Co-driver controller (operates fuel subsystem)
-    Logger.recordOutput("CoDriverInputs/LeftX", coDriver.getLeftX());
-    Logger.recordOutput("CoDriverInputs/LeftY", coDriver.getLeftY());
-    Logger.recordOutput("CoDriverInputs/RightX", coDriver.getRightX());
-    Logger.recordOutput("CoDriverInputs/RightY", coDriver.getRightY());
-    Logger.recordOutput("CoDriverInputs/LeftTrigger", coDriver.getLeftTriggerAxis());
-    Logger.recordOutput("CoDriverInputs/RightTrigger", coDriver.getRightTriggerAxis());
-
-    Logger.recordOutput("CoDriverInputs/A", coDriver.a().getAsBoolean());
-    Logger.recordOutput("CoDriverInputs/B", coDriver.b().getAsBoolean());
-    Logger.recordOutput("CoDriverInputs/X", coDriver.x().getAsBoolean());
-    Logger.recordOutput("CoDriverInputs/Y", coDriver.y().getAsBoolean());
-    Logger.recordOutput("CoDriverInputs/LeftBumper", coDriver.leftBumper().getAsBoolean());
-    Logger.recordOutput("CoDriverInputs/RightBumper", coDriver.rightBumper().getAsBoolean());
-    Logger.recordOutput("CoDriverInputs/Back", coDriver.back().getAsBoolean());
-    Logger.recordOutput("CoDriverInputs/Start", coDriver.start().getAsBoolean());
 
     // =====================================================================══
     // MATCH CONTEXT - Know when things happened
@@ -349,4 +331,5 @@ public class RobotContainer {
   private void setTestTarget(Pose2d target) {
     this.testTarget = target;
   }
+
 }

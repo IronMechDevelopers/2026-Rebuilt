@@ -4,6 +4,7 @@
 
 package frc.robot.subsystems;
 
+import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.SparkBase.ResetMode;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
@@ -36,25 +37,37 @@ public class CANFuelSubsystem extends SubsystemBase {
     SmartDashboard.putNumber("Launching indexer roller value", LAUNCHING_INDEXER_VOLTAGE);
     SmartDashboard.putNumber("Launching main roller value", LAUNCHING_MAIN_ROLLER_VOLTAGE);
     SmartDashboard.putNumber("Spin-up indexer roller value", SPIN_UP_INDEXER_VOLTAGE);
+    SmartDashboard.putNumber("Slow indexer", LAUNCHING_SLOW_INDEXER_VOLTAGE);
+    SmartDashboard.putNumber("Slow Launching", LAUNCHING_MAIN_ROLLER_SLOW_VOLTAGE);
 
     // create the configuration for the indexer roller, set a current limit and apply
     // the config to the controller
     SparkMaxConfig indexerConfig = new SparkMaxConfig();
     indexerConfig.smartCurrentLimit(INDEXER_CURRENT_LIMIT);
-    indexerConfig.inverted(true);
+    //indexerConfig.inverted(true);
     indexerRoller.configure(indexerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
     // create the configuration for the main roller, set a current limit, set
     // the motor to inverted so that positive values are used for both intaking and
     // launching, and apply the config to the controller
     SparkMaxConfig mainRollerConfig = new SparkMaxConfig();
-    mainRollerConfig.inverted(true);
+    //mainRollerConfig.inverted(true);
     mainRollerConfig.smartCurrentLimit(MAIN_ROLLER_CURRENT_LIMIT);
     mainRoller.configure(mainRollerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+
+    // RelativeEncoder encoder = mainRoller.getEncoder();  mk
+
+
   }
 
   // A method to set the rollers to values for intaking
   public void intake() {
+    indexerRoller.setVoltage(SmartDashboard.getNumber("Intaking indexer roller value", INTAKING_INDEXER_VOLTAGE));
+    mainRoller
+        .setVoltage(SmartDashboard.getNumber("Intaking main roller value", INTAKING_MAIN_ROLLER_VOLTAGE));
+  }
+
+    public void slowIntake() {
     indexerRoller.setVoltage(SmartDashboard.getNumber("Intaking indexer roller value", INTAKING_INDEXER_VOLTAGE));
     mainRoller
         .setVoltage(SmartDashboard.getNumber("Intaking main roller value", INTAKING_MAIN_ROLLER_VOLTAGE));
@@ -76,6 +89,13 @@ public class CANFuelSubsystem extends SubsystemBase {
         .setVoltage(SmartDashboard.getNumber("Launching main roller value", LAUNCHING_MAIN_ROLLER_VOLTAGE));
   }
 
+
+    public void launchSlow() {
+    indexerRoller.setVoltage(SmartDashboard.getNumber("Slow indexer", LAUNCHING_SLOW_INDEXER_VOLTAGE));
+    mainRoller
+        .setVoltage(SmartDashboard.getNumber("Slow Launching", LAUNCHING_MAIN_ROLLER_SLOW_VOLTAGE));
+  }
+
   // A method to stop the rollers
   public void stop() {
     indexerRoller.set(0);
@@ -91,10 +111,21 @@ public class CANFuelSubsystem extends SubsystemBase {
         .setVoltage(SmartDashboard.getNumber("Launching main roller value", LAUNCHING_MAIN_ROLLER_VOLTAGE));
   }
 
+  public void spinUpAuto(){
+        indexerRoller
+        .setVoltage(0);
+    mainRoller
+        .setVoltage(SmartDashboard.getNumber("Launching main roller value", LAUNCHING_MAIN_ROLLER_VOLTAGE));
+  }
+
   // A command factory to turn the spinUp method into a command that requires this
   // subsystem
   public Command spinUpCommand() {
     return this.run(() -> spinUp());
+  }
+
+    public Command spinUpAutoCommand() {
+    return this.run(() -> spinUpAuto());
   }
 
   // A command factory to turn the launch method into a command that requires this
@@ -103,10 +134,20 @@ public class CANFuelSubsystem extends SubsystemBase {
     return this.run(() -> launch());
   }
 
+
+    // A command factory to turn the launch method into a command that requires this
+  // subsystem
+  public Command launchSlowCommand() {
+    return this.run(() -> launchSlow());
+  }
+
   // A command factory to turn the intake method into a command that requires this
   // subsystem
   public Command intakeCommand() {
     return this.run(() -> intake());
+  }
+  public Command slowIntakeCommand() {
+    return this.run(() -> slowIntake());
   }
 
   // A command factory to turn the eject method into a command that requires this

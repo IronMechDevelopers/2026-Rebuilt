@@ -17,11 +17,11 @@ public final class HardwareConstants {
   // ROBOT PHYSICAL DIMENSIONS
   // =====================================================================══
 
-  /** Distance between left and right wheels (meters). Default: 29 inches for MAXSwerve. */
-  public static final double kTrackWidth = Units.inchesToMeters(29);
+  /** Distance between left and right wheels (meters). Default: 27.5 inches for MAXSwerve. */
+  public static final double kTrackWidth = Units.inchesToMeters(27.5);
 
-  /** Distance between front and back wheels (meters). Default: 29 inches for MAXSwerve. */
-  public static final double kWheelBase = Units.inchesToMeters(29);
+  /** Distance between front and back wheels (meters). Default: 27.5 inches for MAXSwerve. */
+  public static final double kWheelBase = Units.inchesToMeters(27.5);
 
   /** Swerve module positions relative to robot center. Order: FL, FR, RL, RR. */
   public static final Translation2d[] kModuleTranslations = new Translation2d[] {
@@ -92,7 +92,7 @@ public final class HardwareConstants {
   public static final double kDrivingMotorReduction = (45.0 * 22) / (kDrivingMotorPinionTeeth * 15);
 
   // =====================================================================══
-  // MOTOR CONFIGURATION
+  // MOTOR CONFIGURATION23
   // =====================================================================══
 
   /** Driving motor current limit (amps). Prevents brownouts and motor overheating. */
@@ -102,7 +102,7 @@ public final class HardwareConstants {
   public static final int kTurningMotorCurrentLimit = 20;
 
   /** Driving motor PID - Proportional gain. Tune if wheels oscillate or don't reach speed. */
-  public static final double kDrivingP = 0.04;
+  public static final double kDrivingP = 0.02;
 
   /** Driving motor PID - Integral gain. Usually 0 for velocity control. */
   public static final double kDrivingI = 0.0;
@@ -126,6 +126,8 @@ public final class HardwareConstants {
 
   /** Driver controller USB port. */
   public static final int kDriverControllerPort = 0;
+  public static final int kDriverLeftControllerPort =0 ;
+  public static final int kDriverRightControllerPort =1 ;
 
   /** Co-driver controller USB port. */
   public static final int kCoDriverControllerPort = 1;
