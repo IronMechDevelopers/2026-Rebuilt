@@ -50,11 +50,17 @@ public class AutoSelector {
   private SendableChooser<Command> createAutoChooser() {
     SendableChooser<Command> chooser = new SendableChooser<>();
 
-  chooser.addOption("Shoot Gather Shoot", new PathPlannerAuto("Shoot Gather Shoot"));
-  chooser.addOption("Right Side Spin", new PathPlannerAuto("Right-Side-Spin"));
-  chooser.addOption("Right Hub Shoot", new PathPlannerAuto("Right Hub Shoot"));
-  chooser.addOption("Center Shoot", new PathPlannerAuto("Center Shoot"));
-  chooser.addOption("Outpost",new PathPlannerAuto("Outpost"));
+  // Wrap PathPlannerAuto in Commands.defer() to create fresh command each time
+  chooser.addOption("Shoot Gather Shoot",
+      Commands.defer(() -> new PathPlannerAuto("Shoot Gather Shoot"), Set.of()));
+  chooser.addOption("Right Side Spin",
+      Commands.defer(() -> new PathPlannerAuto("Right-Side-Spin"), Set.of()));
+  chooser.addOption("Right Hub Shoot",
+      Commands.defer(() -> new PathPlannerAuto("Right Hub Shoot"), Set.of()));
+  chooser.addOption("Center Shoot",
+      Commands.defer(() -> new PathPlannerAuto("Center Shoot"), Set.of()));
+  chooser.addOption("Outpost",
+      Commands.defer(() -> new PathPlannerAuto("Outpost"), Set.of()));
 
 
   chooser.setDefaultOption("Do Nothing", Commands.none());

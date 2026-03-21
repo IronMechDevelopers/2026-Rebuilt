@@ -4,7 +4,6 @@
 
 package frc.robot.subsystems;
 
-import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.SparkBase.ResetMode;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
@@ -21,6 +20,9 @@ import static frc.robot.constants.FuelConstants.*;
 public class CANFuelSubsystem extends SubsystemBase {
   private final SparkMax indexerRoller;
   private final SparkMax mainRoller;
+
+  // State tracking for logging
+  private String currentState = "STOPPED";
 
   /** Creates a new CANBallSubsystem. */
   public CANFuelSubsystem() {
@@ -54,20 +56,18 @@ public class CANFuelSubsystem extends SubsystemBase {
     //mainRollerConfig.inverted(true);
     mainRollerConfig.smartCurrentLimit(MAIN_ROLLER_CURRENT_LIMIT);
     mainRoller.configure(mainRollerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
-
-    // RelativeEncoder encoder = mainRoller.getEncoder();  mk
-
-
   }
 
   // A method to set the rollers to values for intaking
   public void intake() {
+    currentState = "INTAKING";
     indexerRoller.setVoltage(SmartDashboard.getNumber("Intaking indexer roller value", INTAKING_INDEXER_VOLTAGE));
     mainRoller
         .setVoltage(SmartDashboard.getNumber("Intaking main roller value", INTAKING_MAIN_ROLLER_VOLTAGE));
   }
 
     public void slowIntake() {
+    currentState = "SLOW_INTAKING";
     indexerRoller.setVoltage(SmartDashboard.getNumber("Intaking indexer roller value", INTAKING_INDEXER_VOLTAGE));
     mainRoller
         .setVoltage(SmartDashboard.getNumber("Intaking main roller value", INTAKING_MAIN_ROLLER_VOLTAGE));
@@ -76,6 +76,7 @@ public class CANFuelSubsystem extends SubsystemBase {
   // A method to set the rollers to values for ejecting fuel out the intake. Uses
   // the same values as intaking, but in the opposite direction.
   public void eject() {
+    currentState = "EJECTING";
     indexerRoller
         .setVoltage(EJECT_INDEXER_VOLTAGE);
     mainRoller
@@ -84,6 +85,7 @@ public class CANFuelSubsystem extends SubsystemBase {
 
   // A method to set the rollers to values for launching.
   public void launch() {
+    currentState = "LAUNCHING";
     indexerRoller.setVoltage(SmartDashboard.getNumber("Launching indexer roller value", LAUNCHING_INDEXER_VOLTAGE));
     mainRoller
         .setVoltage(SmartDashboard.getNumber("Launching main roller value", LAUNCHING_MAIN_ROLLER_VOLTAGE));
@@ -91,6 +93,7 @@ public class CANFuelSubsystem extends SubsystemBase {
 
 
     public void launchSlow() {
+    currentState = "LAUNCHING_SLOW";
     indexerRoller.setVoltage(SmartDashboard.getNumber("Slow indexer", LAUNCHING_SLOW_INDEXER_VOLTAGE));
     mainRoller
         .setVoltage(SmartDashboard.getNumber("Slow Launching", LAUNCHING_MAIN_ROLLER_SLOW_VOLTAGE));
@@ -98,6 +101,7 @@ public class CANFuelSubsystem extends SubsystemBase {
 
   // A method to stop the rollers
   public void stop() {
+    currentState = "STOPPED";
     indexerRoller.set(0);
     mainRoller.set(0);
   }
@@ -105,6 +109,7 @@ public class CANFuelSubsystem extends SubsystemBase {
   // A method to spin up the main roller while spinning the indexer roller to
   // push Fuel away from the launcher
   public void spinUp() {
+    currentState = "SPINNING_UP";
     indexerRoller
         .setVoltage(SmartDashboard.getNumber("Spin-up indexer roller value", SPIN_UP_INDEXER_VOLTAGE));
     mainRoller
@@ -112,6 +117,7 @@ public class CANFuelSubsystem extends SubsystemBase {
   }
 
   public void spinUpAuto(){
+    currentState = "SPINNING_UP_AUTO";
         indexerRoller
         .setVoltage(0);
     mainRoller
@@ -158,11 +164,28 @@ public class CANFuelSubsystem extends SubsystemBase {
 
   @Override
   public void periodic() {
-    // Log motor states for debugging fuel handling issues
-    Logger.recordOutput("Fuel/IndexerCurrent", indexerRoller.getOutputCurrent());
-    Logger.recordOutput("Fuel/IndexerAppliedOutput", indexerRoller.getAppliedOutput());
+    // =====================================================================══
+    // ADVANTAGEKIT LOGGING - Fuel handling telemetry for AdvantageScope
+    // =====================================================================══
+    //
+    // All data logged here is available in AdvantageScope for post-match analysis.
+    // Use this to debug fuel handling issues, tune voltages, and verify states.
+    //
+    // NOTE: CIM motors don't have encoders, so we log current/voltage/state only
+    //
+    // =====================================================================══
 
-    Logger.recordOutput("Fuel/MainRollerCurrent", mainRoller.getOutputCurrent());
-    Logger.recordOutput("Fuel/MainRollerAppliedOutput", mainRoller.getAppliedOutput());
+    // --- STATE TRACKING (For debugging command sequencing) ---
+    Logger.recordOutput("Fuel/State", currentState);
+
+    // --- INDEXER ROLLER TELEMETRY ---
+    Logger.recordOutput("Fuel/Indexer/Current", indexerRoller.getOutputCurrent());
+    Logger.recordOutput("Fuel/Indexer/AppliedOutput", indexerRoller.getAppliedOutput());
+    Logger.recordOutput("Fuel/Indexer/Voltage", indexerRoller.getAppliedOutput() * indexerRoller.getBusVoltage());
+
+    // --- MAIN ROLLER TELEMETRY ---
+    Logger.recordOutput("Fuel/MainRoller/Current", mainRoller.getOutputCurrent());
+    Logger.recordOutput("Fuel/MainRoller/AppliedOutput", mainRoller.getAppliedOutput());
+    Logger.recordOutput("Fuel/MainRoller/Voltage", mainRoller.getAppliedOutput() * mainRoller.getBusVoltage());
   }
 }

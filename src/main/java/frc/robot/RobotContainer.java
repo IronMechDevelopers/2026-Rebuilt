@@ -193,11 +193,8 @@ public class RobotContainer {
    * @return Selected auto command or null
    */
   public Command getAutonomousCommand() {
-    // return new PathPlannerAuto("Right-Side-Spin");
-    // return new PathPlannerAuto("right_hub_shoot");
-    // return new PathPlannerAuto("center_shoot");
-    return new PathPlannerAuto("Shoot Gather Shoot");
-    // return autoSelector.getSelectedAuto();
+    // return new PathPlannerAuto("Shoot Gather Shoot");
+    return autoSelector.getSelectedAuto();
   }
 
   /**

@@ -81,6 +81,10 @@ public class DriveSubsystem extends SubsystemBase {
     private double distanceToHub = 0.0;              // Distance to scoring hub (meters)
     private boolean inHubRange = false;              // Within scoring range
 
+    // Cached values for "log on change" optimization
+    private double lastLoggedSpeedMultiplier = DriveConstants.kDefaultSpeedMultiplier;
+    private boolean lastLoggedFieldRelative = true;
+
     // =====================================================================══
     // VISION REJECTION TRACKING - Debug why poses are filtered in DriveSubsystem
     // =====================================================================══
@@ -253,7 +257,18 @@ public class DriveSubsystem extends SubsystemBase {
 
         Logger.recordOutput("Drive/DistanceToHub", distanceToHub);
         Logger.recordOutput("Drive/InHubRange", inHubRange);
-        Logger.recordOutput("Drive/fieldRelative", fieldRelative);
+
+        // --- DRIVER CONTROL MODES (Log only on change to reduce bandwidth) ---
+        if (fieldRelative != lastLoggedFieldRelative) {
+            Logger.recordOutput("Drive/FieldRelative", fieldRelative);
+            Logger.recordOutput("Drive/FieldRelativeChangeTime", Timer.getFPGATimestamp());
+            lastLoggedFieldRelative = fieldRelative;
+        }
+        if (speedMultiplier != lastLoggedSpeedMultiplier) {
+            Logger.recordOutput("Drive/SpeedMultiplier", speedMultiplier);
+            Logger.recordOutput("Drive/SpeedMultiplierChangeTime", Timer.getFPGATimestamp());
+            lastLoggedSpeedMultiplier = speedMultiplier;
+        }
     }
 
     /**
